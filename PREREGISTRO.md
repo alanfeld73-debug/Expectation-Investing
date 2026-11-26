@@ -68,3 +68,15 @@ Período 2016-05 a 2026-11. **No aprobado: no cumple ninguna condición.**
 - Condición 2a: alfa -0.75% anual, t = -0.56 (hacía falta > 0 y t ≥ 2).
 - Condición 2b: Q1 > Q5 en 2 de 5 niveles de múltiplo (hacían falta 3).
 Detalle en resultados/backtest_v1.html.
+
+## Extensión v1b (fijada el 2026-11-26, antes de correr)
+Pedido del usuario: más historia y RSP como referencia.
+- **Período:** desde abril de 2010 (primer balance XBRL de la SEC con comparativos de 2007-2009; no hay fundamentals
+  estructurados gratis antes de 2009, así que 20 años no son posibles). Hasta noviembre de 2026.
+- **Prueba fuera de muestra:** el tramo **2010-04 a 2016-04 no fue visto**. Se le aplica el mismo criterio de éxito
+  (condiciones 1, 2a y 2b) y se reporta por separado. El veredicto del tramo 2016-2026 no cambia.
+- **RSP (S&P 500 con pesos iguales):** se agrega como referencia. Para 2016-2026 es posterior a ver los resultados;
+  para 2010-2016 queda fijado ahora. La condición 1 se evalúa contra SPY (como estaba) y se reporta también contra RSP.
+- **Sin cambios** en la métrica, la cartera, el rebalanceo, los costos ni las variantes.
+- Ajuste técnico necesario: en 2010-2011 hay menos historia por compañía, así que la tasa de inversión acepta ventanas
+  de 2 años (antes, mínimo 3) y el crecimiento previo de 3 años puede faltar (el base rate usa solo el tamaño).
