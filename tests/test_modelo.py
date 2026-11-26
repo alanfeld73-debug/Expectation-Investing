@@ -90,3 +90,33 @@ def test_sec_serie_anual_filtra_trimestres_y_usa_ultima_reexpresion():
         dict(start="2025-01-01", end="2025-12-31", val=140, form="10-K", filed="2026-02-01"),
     ]
     assert sec._annual_series(items) == {"2022-12-31": 105, "2025-12-31": 140}
+
+
+def test_fundamentals_tasa_impositiva_e_inversion_incremental():
+    import pandas as pd
+    import fundamentals as F
+    rows = []
+    for k, y in enumerate(range(2019, 2026)):           # 7 ejercicios, cierre 31-dic
+        end, start, filed = f"{y}-12-31", f"{y}-01-01", f"{y+1}-02-15"
+        ventas = 1000 * 1.10 ** k
+        flujos = dict(revenue=ventas, pretax=200, tax=42, capex=80, da=50)
+        saldos = dict(assets_cur=300 + 10 * k, cash=100, liab_cur=150, debt_cur=20)
+        for c, v in flujos.items():
+            rows.append(("X", c, c, "USD", start, end, v, "10-K", filed))
+        for c, v in saldos.items():
+            rows.append(("X", c, c, "USD", None, end, v, "10-K", filed))
+    df = pd.DataFrame(rows, columns=["ticker", "campo", "tag", "unit", "start", "end", "val", "form", "filed"])
+    for c in ("start", "end", "filed"):
+        df[c] = pd.to_datetime(df[c])
+    F._DF = df
+    try:
+        m = F.metricas_compania().set_index("ticker").loc["X"]
+        assert m.tax_rate == pytest.approx(0.21)
+        # Ventana 2020->2025: Σ(capex - D&A) = 5 x 30; ΔNWC = 10 x 5 = 50; Δventas = 1000 x (1,1^6 - 1,1^1)
+        ds = 1000 * (1.1 ** 6 - 1.1)
+        assert m.inv_rate == pytest.approx((150 + 50) / ds)
+        assert m.cagr3 == pytest.approx(0.10)
+        # Point-in-time: con as_of a mediados de 2024 el último ejercicio conocido es 2023
+        assert F.metricas_compania(as_of="2024-06-30").set_index("ticker").loc["X"].fy_end == pd.Timestamp("2023-12-31")
+    finally:
+        F._DF = None
