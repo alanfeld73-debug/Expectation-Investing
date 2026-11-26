@@ -13,8 +13,8 @@ de ver resultados invalida la prueba: si se cambia, se anota la fecha, el motivo
 - **Universo:** en cada fecha, las compañías que estaban en el S&P 500 en esa fecha (composición histórica)
   **y que siguen cotizando hoy**. Las deslistadas (quiebras, compras, fusiones) quedan afuera porque no hay
   precios gratis de ellas (decisión del usuario, 2026-11-26).
-- **Rebalanceo:** anual. *Propuesto, a confirmar por el usuario antes de correr.*
-- **Costos:** 20 pb por lado sobre el volumen operado. *Propuesto, a confirmar.*
+- **Rebalanceo:** anual (confirmado por el usuario, 2026-11-26).
+- **Costos:** 20 pb por lado sobre el volumen operado (confirmado por el usuario, 2026-11-26).
 - **Período:** desde que la base point-in-time permite calcular la métrica (fundamentals SEC desde 2012).
 - **Referencia:** SPY con dividendos reinvertidos.
 
@@ -56,3 +56,4 @@ La métrica principal está muy cargada de value: la condición 2 es exigente y 
 | Fecha | Cambio | ¿Antes de ver resultados? |
 |---|---|---|
 | 2026-11-26 | Universo sin deslistadas; se agrega como referencia el promedio con pesos iguales del universo. | Sí |
+| 2026-11-26 | Rebalanceo anual y costos de 20 pb por lado confirmados por el usuario. | Sí |
