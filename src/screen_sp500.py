@@ -21,6 +21,7 @@ import pandas as pd
 import defaults_sector as DS
 import expectations_screen as E
 import rates
+import sesgo
 from baserates import prob
 from pit import ROOT, universo
 
@@ -35,6 +36,7 @@ SPREAD = 0.0125
 SALTO_TTM = 0.15      # TTM fuera del rango [último FY, consenso] por más de esto: posible M&A
 G_EXTREMO = 0.30      # consenso año 1 por encima de esto: hipercrecimiento o M&A
 SS_MAX = 1.50         # valor sin crecimiento / EV por encima de esto: dato sospechoso
+G_TERM_CLIP = (0.0, 0.15)   # punto de llegada de la desaceleración = mediana del base rate, acotada
 ROE_CLIP = (0.05, 0.30)
 TV_COLS = ["name"] + E.COLS
 
@@ -134,7 +136,11 @@ def main():
             rows.append(dict(base, precio=d.get("close"), nota="; ".join(flags)))
             continue
         gi = c.implied_g() if c.m0 > 0 or c.model == "EQUITY" else None
-        v = c.value_per_share(c.fade_path())
+        v4 = c.value_per_share(c.fade_path())          # versión anterior: desacelera a 4%
+        g_term = prob(c.sales0, 0.0, c.g_hist)[2] if c.sales0 > 0 else None
+        c.g_term = float(np.clip(g_term, *G_TERM_CLIP)) if g_term is not None else None
+        v = c.value_per_share(c.fade_path())           # principal: desacelera hacia el base rate
+        ey = (c.ni0 / c.mcap) if c.model == "EQUITY" else (c.sales0 * c.m0 * (1 - c.tax) / c.ev)
         if v < 0:
             flags.append("[revisar] valor negativo: deuda de financiera cautiva o leases")
         if c.steady_state_share() > SS_MAX:
@@ -147,16 +153,19 @@ def main():
                          margen_ebit=c.m0 if c.model == "FCF" else None, roe=c.roe if c.model == "EQUITY" else None,
                          wacc=c.ke if c.model == "EQUITY" else c.wacc, ss_share=c.steady_state_share(),
                          g_impl=gi, g_hist3=c.g_hist, p_base_rate=p_br, g_ref=c.g_ref, mifp=c.mifp(),
-                         v_fade=v, brecha=v / c.price - 1, nota="; ".join(flags)))
+                         g_term=c.g_term, v_fade=v, brecha=v / c.price - 1, brecha_4=v4 / c.price - 1, ey=ey,
+                         nota="; ".join(flags)))
     df = pd.DataFrame(rows)
     ok = df.brecha.notna() & ~df.nota.fillna("").str.contains("[revisar]", regex=False)
-    df.loc[ok, "quintil"] = pd.qcut(df.loc[ok, "brecha"].rank(method="first", ascending=False), 5,
-                                    labels=[1, 2, 3, 4, 5]).astype(int)
+    df = sesgo.rankings(df, ok)
     df["rf"], df["rf_fecha"] = E.RF, E.RF_DATE
     df = df.sort_values("brecha", ascending=False)
     out = os.path.join(E.DATA, "screen_sp500.csv")
     df.to_csv(out, index=False)
     print(f"{len(df)} compañías; {ok.sum()} con brecha válida -> {out}")
+    diag = sesgo.diagnostico(df)
+    diag.to_csv(os.path.join(E.DATA, "sesgo_value.csv"), index=False)
+    print(diag.round(2).to_string(index=False))
     return df, co, sec
 
 

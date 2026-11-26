@@ -120,3 +120,35 @@ def test_fundamentals_tasa_impositiva_e_inversion_incremental():
         assert F.metricas_compania(as_of="2024-06-30").set_index("ticker").loc["X"].fy_end == pd.Timestamp("2023-12-31")
     finally:
         F._DF = None
+
+
+def test_fade_con_punto_de_llegada_propio():
+    c = co(g_ref=0.20)
+    c.g_term = 0.07
+    p = c.fade_path()
+    assert p[0] == pytest.approx(0.20) and p[-1] == pytest.approx(0.07)
+    assert c.fade_path(12)[-1] == pytest.approx(0.07)
+
+
+def test_factores_recupera_alfa_y_betas_sinteticos():
+    import numpy as np
+    import pandas as pd
+    import factores as FF
+    rng = np.random.default_rng(0)
+    idx = pd.period_range("2012-01", periods=168, freq="M")
+    cols = ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "UMD"]
+    F = pd.DataFrame(rng.normal(0, 0.04, (len(idx), 6)), index=idx, columns=cols)
+    y = 0.003 + 1.0 * F["Mkt-RF"] + 0.6 * F["HML"] + rng.normal(0, 0.005, len(idx))
+    r = FF.alfa(pd.Series(y, index=idx), F)
+    assert r.loc["alfa", "coef"] == pytest.approx(0.003, abs=0.0015)
+    assert r.loc["HML", "coef"] == pytest.approx(0.6, abs=0.05)
+    assert r.loc["alfa", "t"] > 2
+
+
+def test_factores_parsea_formato_french():
+    import factores as FF
+    txt = ("This file was created...\n\n,Mkt-RF,SMB,HML,RF\n202401,  1.00, -0.50,  0.20, 0.40\n"
+           "202402,  2.00,  0.10, -0.30, 0.42\n\n Annual Factors: January-December\n,Mkt-RF,SMB,HML,RF\n2024, 5.0, 1.0, 1.0, 5.0\n")
+    df = FF._parse_mensual(txt)
+    assert list(df.columns) == ["Mkt-RF", "SMB", "HML", "RF"] and len(df) == 2
+    assert df.iloc[0]["Mkt-RF"] == pytest.approx(0.01)

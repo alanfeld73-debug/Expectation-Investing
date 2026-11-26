@@ -42,7 +42,8 @@ def datos():
     df["rec"] = df.apply(recomendacion, axis=1)
     df["nota"] = df.nota.fillna("").str.replace("[revisar] ", "", regex=False)
     cols = ["ticker", "nombre", "sector", "modelo", "precio", "mcap_bn", "g_impl", "g_ref", "g_hist3", "p_base_rate",
-            "mifp", "v_fade", "brecha", "quintil", "ss_share", "wacc", "rec", "nota"]
+            "mifp", "v_fade", "brecha", "quintil", "ss_share", "wacc", "rec", "nota", "brecha_4", "quintil_sector",
+            "quintil_dentro_ey", "g_term"]
     filas = []
     for r in df[cols].itertuples(index=False):
         f = []
@@ -50,13 +51,16 @@ def datos():
             if k == "mifp" and isinstance(v, float) and math.isinf(v):
                 f.append(99)
             elif isinstance(v, float):
-                f.append(_num(v, 2 if k in ("precio", "v_fade", "mcap_bn") else 4))
+                v = _num(v, 2 if k in ("precio", "v_fade", "mcap_bn") else 4)
+                f.append(int(v) if k.startswith("quintil") and v is not None else v)
             else:
                 f.append(v if v == v else None)
         filas.append(f)
     sectores = [dict(sector=s.sector, tax=_num(s.tax_default), inv=_num(s.inv_default), n=int(s.n)) for s in sec.itertuples()]
+    diag = pd.read_csv(os.path.join(DATA, "sesgo_value.csv"))
+    sesgo = [dict(v=r.variante, rho=_num(r.rho_rendimiento), q1=_num(r.q1_en_ey1)) for r in diag.itertuples()]
     meta = dict(fecha=f"{dt.date.today():%d-%m-%Y}", rf=_num(df.rf.iloc[0]), rf_fecha=str(df.rf_fecha.iloc[0]))
-    return dict(cols=cols, filas=filas, sectores=sectores, meta=meta)
+    return dict(cols=cols, filas=filas, sectores=sectores, meta=meta, sesgo=sesgo)
 
 
 PLANTILLA = r"""<title>Screen S&amp;P 500</title>
@@ -154,7 +158,7 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
     <div class="eyebrow">Expectations Investing · Semana 1 · corrida cruda</div>
     <h1>Screen S&amp;P 500</h1>
     <p class="lede">Qué crecimiento descuenta el precio de cada compañía y cuánto vale si cumple el consenso del año 1 y luego
-      desacelera a 4%. La <b>brecha</b> es ese valor sobre el precio. Defaults de impuestos e inversión por sector, sin
+      desacelera hasta el crecimiento histórico típico de su tamaño (base rate, 3-7%). La <b>brecha</b> es ese valor sobre el precio. Defaults de impuestos e inversión por sector, sin
       normalizar: sirve para elegir los candidatos de la Semana 2, no para decidir compras.</p>
     <div class="meta" id="meta"></div>
   </header>
@@ -179,6 +183,14 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
   </section>
 
   <section class="panel">
+    <h2>Sesgo value</h2>
+    <p class="note" style="margin:0 0 12px">¿Cuánto se parece cada ranking a ordenar por múltiplo barato (NOPAT / EV)? Correlación 1 =
+      es value puro. El backtest exige que el método gane también dentro de cada nivel de múltiplo (ver PREREGISTRO.md).</p>
+    <div class="scroll"><table id="sesgo"><thead><tr><th>Ranking</th><th class="r">Correlación con value</th>
+      <th>Q1 en el quintil más barato</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="panel">
     <h2>Todas las compañías</h2>
     <div class="filters">
       <input id="q" type="search" placeholder="Buscar ticker o compañía" aria-label="Buscar">
@@ -194,6 +206,10 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
   </section>
 
   <footer class="foot">
+    <div><b>Brecha.</b> Valor por acción si la empresa crece al consenso en el año 1 y desacelera en línea recta hasta la
+      mediana histórica de empresas de su tamaño y crecimiento previo (base rate) en el año 10; después, sin crecimiento
+      (residual de Rappaport). Brecha 4%: la misma cuenta desacelerando a 4% fijo. Q sector: quintil dentro de su sector.
+      Q en su múltiplo: quintil de brecha entre empresas con múltiplo parecido.</div>
     <div><b>Cómo leer cada columna.</b> g implícito: CAGR de ventas a 10 años que justifica el precio. g consenso: crecimiento
       de ventas del ejercicio en curso según analistas. CAGR 3a: crecimiento real de los últimos 3 ejercicios (SEC).
       P(base rate): porcentaje de compañías de tamaño y crecimiento previo similares que lograron el g implícito en 10 años.
@@ -273,11 +289,19 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
     fsec.insertAdjacentHTML("beforeend", `<option>${s.sector}</option>`);
   });
 
+  // Sesgo value
+  const sb = document.querySelector("#sesgo tbody");
+  D.sesgo.forEach(r => { const w = Math.round((r.q1 || 0) * 100);
+    sb.insertAdjacentHTML("beforeend", `<tr><td>${r.v}</td><td class="r num">${r.rho == null ? "—" : r.rho.toFixed(2).replace(".", ",")}</td>` +
+      `<td><span style="display:inline-block;vertical-align:middle;height:10px;width:${w * 1.6}px;background:var(--hold);border-radius:2px;margin-right:8px"></span>` +
+      `<span class="num">${w}%</span></td></tr>`); });
+
   // Tabla principal
   const COLS = [["ticker", "Ticker"], ["nombre", "Compañía"], ["sector", "Sector"], ["precio", "Precio", "r"],
     ["mcap_bn", "Mkt cap bn", "r"], ["g_impl", "g implícito", "r"], ["g_ref", "g consenso", "r"], ["g_hist3", "CAGR 3a", "r"],
     ["p_base_rate", "P(base rate)", "r"], ["mifp", "MIFP", "r"], ["v_fade", "Valor", "r"], ["brecha", "Brecha", "r"],
-    ["quintil", "Q", "r"], ["rec", "Recomendación"]];
+    ["quintil", "Q", "r"], ["brecha_4", "Brecha 4%", "r"], ["quintil_sector", "Q sector", "r"],
+    ["quintil_dentro_ey", "Q en su múltiplo", "r"], ["rec", "Recomendación"]];
   const thead = document.querySelector("#tabla thead tr");
   COLS.forEach(([k, l, a]) => { const th = document.createElement("th"); th.textContent = l; if (a) th.className = a;
     th.dataset.k = k; th.tabIndex = 0; th.onclick = th.onkeydown = e => { if (e.type === "keydown" && e.key !== "Enter") return;
@@ -294,8 +318,8 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
       case "g_impl": case "g_ref": case "g_hist3": return `<td class="r num">${pct(v, 1)}</td>`;
       case "p_base_rate": return `<td class="r num">${pct(v)}</td>`;
       case "mifp": return `<td class="r num">${v == null ? "—" : v >= 99 ? "&gt;40" : fmt(v, 1)}</td>`;
-      case "brecha": return `<td class="r num ${v == null ? "" : v >= 0 ? "pos" : "neg"}">${pct(v)}</td>`;
-      case "quintil": return `<td class="r">${v == null ? "—" : `<span class="q q${v}">${v}</span>`}</td>`;
+      case "brecha": case "brecha_4": return `<td class="r num ${v == null ? "" : v >= 0 ? "pos" : "neg"}">${pct(v)}</td>`;
+      case "quintil": case "quintil_sector": case "quintil_dentro_ey": return `<td class="r">${v == null ? "—" : `<span class="q q${v}">${v}</span>`}</td>`;
       case "rec": return `<td><span class="pill ${cls(v)}">${(REC.find(x => x[0] === v) || [, v])[1]}</span></td>`;
       default: return `<td>${v ?? "—"}</td>`;
     }
@@ -319,7 +343,7 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
     tbody.innerHTML = rs.map(r => {
       const main = `<tr data-t="${r[I.ticker]}">${COLS.map(([c]) => cell(c, r)).join("")}</tr>`;
       if (state.open !== r[I.ticker]) return main;
-      const det = [`Modelo ${r[I.modelo] || "—"}`, `WACC/Ke ${pct(r[I.wacc], 1)}`, `Valor sin crecimiento / EV ${pct(r[I.ss_share])}`]
+      const det = [`Modelo ${r[I.modelo] || "—"}`, `WACC/Ke ${pct(r[I.wacc], 1)}`, `Crecimiento año 10 (base rate) ${pct(r[I.g_term], 1)}`, `Valor sin crecimiento / EV ${pct(r[I.ss_share])}`]
         .join(" · ") + (r[I.nota] ? ` · <b>Nota:</b> ${r[I.nota]}` : "");
       return main + `<tr class="detail"><td colspan="${COLS.length}">${det}</td></tr>`;
     }).join("");

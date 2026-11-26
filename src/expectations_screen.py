@@ -134,6 +134,7 @@ class Co:
     ni0: float = 0.0
     roe: float = 0.15
     g_hist: float | None = None
+    g_term: float | None = None   # crecimiento del año 10 en la trayectoria fade (None = G_TERMINAL, 4%)
     note: str = ""
     flags: list = field(default_factory=list)
 
@@ -185,9 +186,9 @@ class Co:
         return None
 
     def fade_path(self, n=H):
-        g1 = self.g_ref
-        path = [g1 + (G_TERMINAL - g1) * i / (H - 1) for i in range(H)]
-        return (path + [G_TERMINAL] * max(0, n - H))[:n]
+        g1, gt = self.g_ref, (G_TERMINAL if self.g_term is None else self.g_term)
+        path = [g1 + (gt - g1) * i / (H - 1) for i in range(H)]
+        return (path + [gt] * max(0, n - H))[:n]
 
     def mifp(self, max_years=40):
         """Market-Implied Forecast Period: años de creación de valor (con la trayectoria

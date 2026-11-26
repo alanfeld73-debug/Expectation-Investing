@@ -33,6 +33,9 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/defaults_sector.py`: defaults por sector GICS (medianas).
 - `src/screen_sp500.py` / `src/exportar_sp500.py`: corrida cruda del S&P 500 y su Excel.
 - `src/exportar_html.py`: página HTML de la corrida del S&P 500 (tabla filtrable, quintiles, sectores).
+- `src/sesgo.py`: rankings (principal, 4%, P(base rate), sector, doble orden por múltiplo) y diagnóstico de sesgo value.
+- `src/factores.py`: regresión Fama-French 5 + momentum (Newey-West) para el backtest.
+- `PREREGISTRO.md`: diseño y criterio del backtest fijados antes de ver resultados. No cambiar sin anotar.
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 
