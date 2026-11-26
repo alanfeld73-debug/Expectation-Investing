@@ -15,7 +15,7 @@ import pandas as pd
 import sec
 from pit import ROOT, universo
 
-FECHAS = [pd.Timestamp(f"{y}-04-30") for y in range(2016, 2027)]   # rebalanceo anual, fin de abril
+FECHAS = [pd.Timestamp(f"{y}-04-30") for y in range(2010, 2027)]   # rebalanceo anual, fin de abril
 OUT = os.path.join(ROOT, "data", "universo", "universo_bt.csv")
 HIST = os.path.join(ROOT, "data", "universo", "sp500_historico.csv")
 

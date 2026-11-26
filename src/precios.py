@@ -17,7 +17,7 @@ from pit import ROOT
 
 DIR = os.path.join(ROOT, "data", "precios")
 OUT = os.path.join(DIR, "mensual.parquet")
-DESDE = 1262304000   # 2010-01-01
+DESDE = 1104537600   # 2005-01-01 (beta de 60 meses para abril de 2010)
 
 
 def yahoo_symbol(t):
@@ -73,7 +73,7 @@ def a_tabla(t, d):
 
 def main():
     u = pd.read_csv(os.path.join(ROOT, "data", "universo", "universo_bt.csv"))
-    tickers = sorted(set(u.ticker.dropna())) + ["SPY"]
+    tickers = sorted(set(u.ticker.dropna())) + ["SPY", "RSP"]
     partes, faltan = [], []
     for i, t in enumerate(tickers, 1):
         tabla = a_tabla(t, bajar(t)) if bajar(t) else None

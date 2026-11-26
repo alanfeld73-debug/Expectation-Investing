@@ -67,6 +67,33 @@ def stats(s, rf):
     return dict(cagr=cagr, vol=vol, sharpe=ex.mean() / s.std() * np.sqrt(12), max_dd=dd, meses=n)
 
 
+def evaluar(M, F):
+    """Criterio pre-registrado sobre un tramo de retornos mensuales M."""
+    rf = F["RF"]
+    A = M.apply(anual)
+    completos = [y for y in A.index if (M.index.year == y).sum() == 12]
+    gana = A.loc[completos, "Q1"] > A.loc[completos, "SPY"]
+    c1 = dict(anios=len(completos), gana=int(gana.sum()), cumple=bool(gana.sum() > len(completos) / 2),
+              gana_universo=int((A.loc[completos, "Q1"] > A.loc[completos, "Universo (pesos iguales)"]).sum()),
+              gana_rsp=int((A.loc[completos, "Q1"] > A.loc[completos, "RSP"]).sum()))
+    reg = FF.alfa(M["Q1"] - rf.reindex(M.index), F)
+    reg_rsp = FF.alfa(M["Q1"] - M["RSP"], F)
+    c2a = dict(alfa_mensual=float(reg.loc["alfa", "coef"]), t=float(reg.loc["alfa", "t"]),
+               alfa_anual=float(reg.loc["alfa", "coef"] * 12), hml=float(reg.loc["HML", "coef"]),
+               t_hml=float(reg.loc["HML", "t"]), n=reg.attrs["n"], r2=reg.attrs["r2"],
+               alfa_vs_rsp_anual=float(reg_rsp.loc["alfa", "coef"] * 12), t_vs_rsp=float(reg_rsp.loc["alfa", "t"]),
+               cumple=bool(reg.loc["alfa", "coef"] > 0 and reg.loc["alfa", "t"] >= 2))
+    cg = lambda x: (1 + x).prod() ** (12 / len(x)) - 1
+    spreads = {k: float(cg(M[f"EY{k}-Q1"]) - cg(M[f"EY{k}-Q5"])) for k in range(1, 6)}
+    pos = sum(v > 0 for v in spreads.values())
+    c2b = dict(spreads=spreads, positivos=pos, promedio=float(np.mean(list(spreads.values()))),
+               cumple=bool(pos >= 3 and np.mean(list(spreads.values())) > 0))
+    return dict(desde=str(M.index.min()), hasta=str(M.index.max()), criterio1=c1, criterio2a=c2a, criterio2b=c2b,
+                aprobado=bool(c1["cumple"] and c2a["cumple"] and c2b["cumple"]),
+                stats={c: stats(M[c], rf) for c in M.columns}, regresion=reg.round(5).to_dict(),
+                anual=A.loc[completos].round(5).to_dict())
+
+
 def main():
     b = pd.read_parquet(os.path.join(DIR, "brechas.parquet"))
     px = pd.read_parquet(os.path.join(ROOT, "data", "precios", "mensual.parquet"))
@@ -89,47 +116,30 @@ def main():
             carteras[f"EY{k}-Q{q}"] = cartera(R, armar(lambda d, k=k, q=q: (d.quintil_ey == k) & (d.quintil_dentro_ey == q)), f"EY{k}-Q{q}")
     inicio = carteras["Q1"].index.min()
     carteras["SPY"] = R["SPY"].loc[R.index >= inicio].rename("SPY")
+    carteras["RSP"] = R["RSP"].loc[R.index >= inicio].rename("RSP")
     M = pd.DataFrame(carteras).dropna(subset=["Q1", "SPY"])
     M.to_csv(os.path.join(DIR, "mensual.csv"))
-
     F = FF.factores()
-    rf = F["RF"]
     A = M.apply(anual)
-    ultimo = M.index.max()
-    completos = [y for y in A.index if (M.index.year == y).sum() == 12]
-    A["completo"] = A.index.isin(completos)
+    A["completo"] = [(M.index.year == y).sum() == 12 for y in A.index]
     A.to_csv(os.path.join(DIR, "anual.csv"))
-
-    # Criterio 1
-    gana = (A.loc[completos, "Q1"] > A.loc[completos, "SPY"])
-    c1 = dict(anios=len(completos), gana=int(gana.sum()), cumple=bool(gana.sum() > len(completos) / 2),
-              gana_universo=int((A.loc[completos, "Q1"] > A.loc[completos, "Universo (pesos iguales)"]).sum()))
-    # Criterio 2a
-    reg = FF.alfa(M["Q1"] - rf.reindex(M.index), F)
-    reg_univ = FF.alfa(M["Universo (pesos iguales)"] - rf.reindex(M.index), F)
-    c2a = dict(alfa_mensual=float(reg.loc["alfa", "coef"]), t=float(reg.loc["alfa", "t"]),
-               alfa_anual=float((1 + reg.loc["alfa", "coef"]) ** 12 - 1), hml=float(reg.loc["HML", "coef"]),
-               t_hml=float(reg.loc["HML", "t"]), n=reg.attrs["n"], r2=reg.attrs["r2"],
-               cumple=bool(reg.loc["alfa", "coef"] > 0 and reg.loc["alfa", "t"] >= 2))
-    # Criterio 2b
-    spreads = {k: float(((1 + M[f"EY{k}-Q1"]).prod() ** (12 / len(M)) - 1) - ((1 + M[f"EY{k}-Q5"]).prod() ** (12 / len(M)) - 1))
-               for k in range(1, 6)}
-    pos = sum(v > 0 for v in spreads.values())
-    c2b = dict(spreads=spreads, positivos=pos, promedio=float(np.mean(list(spreads.values()))),
-               cumple=bool(pos >= 3 and np.mean(list(spreads.values())) > 0))
-    st = {c: stats(M[c], rf) for c in M.columns}
-    # Exclusiones por año (sesgo de supervivencia)
+    corte = pd.Period("2016-04", "M")
+    tramos = {"2010-2016 (fuera de muestra)": M[M.index <= corte],
+              "2016-2026 (v1)": M[M.index > corte],
+              "Completo 2010-2026": M}
+    res_tramos = {k: evaluar(v, F) for k, v in tramos.items() if len(v) > 12}
     u = pd.read_csv(os.path.join(ROOT, "data", "universo", "universo_bt.csv"))
     excl = u.groupby("fecha").apply(lambda d: dict(miembros=len(d), afuera=int(d.ticker.isna().sum()))).to_dict()
-    res = dict(desde=str(M.index.min()), hasta=str(ultimo), criterio1=c1, criterio2a=c2a, criterio2b=c2b,
-               aprobado=bool(c1["cumple"] and c2a["cumple"] and c2b["cumple"]), stats=st,
-               regresion=reg.round(5).to_dict(), regresion_universo=reg_univ.round(5).to_dict(), exclusiones=excl,
+    res = dict(desde=str(M.index.min()), hasta=str(M.index.max()), tramos=res_tramos, exclusiones=excl,
                n_q1={str(pd.Timestamp(k).date()): int(v) for k, v in rk[rk.quintil == 1].groupby("fecha").size().items()})
     with open(os.path.join(DIR, "resultado.json"), "w") as f:
         json.dump(res, f, indent=1, default=str)
     pd.set_option("display.width", 200)
-    print(A[["Q1", "Q2", "Q3", "Q4", "Q5", "Universo (pesos iguales)", "SPY", "completo"]].round(3).to_string())
-    print(json.dumps({k: res[k] for k in ("criterio1", "criterio2a", "criterio2b", "aprobado")}, indent=1, default=str))
+    print(A[["Q1", "Q2", "Q3", "Q4", "Q5", "Universo (pesos iguales)", "RSP", "SPY", "completo"]].round(3).to_string())
+    for k, v in res_tramos.items():
+        print(f"\n== {k}: aprobado={v['aprobado']}")
+        print(json.dumps({c: v[c] for c in ("criterio1", "criterio2a", "criterio2b")}, indent=1, default=str))
+        print({c: round(v["stats"][c]["cagr"], 4) for c in ("Q1", "Q5", "Universo (pesos iguales)", "RSP", "SPY")})
     return res
 
 

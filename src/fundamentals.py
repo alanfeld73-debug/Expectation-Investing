@@ -107,7 +107,7 @@ def metricas_compania(as_of=None):
             r["tax_n"] = len(w)
         # Tasa de inversión incremental: ventana de 5 años (o 4 o 3 si no hay historia suficiente)
         ini, k = None, YEARS
-        for k in range(YEARS, 2, -1):
+        for k in range(YEARS, 1, -1):   # 5 años; con poca historia (2010-2011), hasta 2
             ini = _cerca(g, last.end - pd.DateOffset(years=k))
             if ini is not None:
                 break

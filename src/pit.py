@@ -5,7 +5,7 @@ Uso:  python pit.py            -> descarga (con caché) y arma data/pit/facts.pa
 Cada fila es un dato tal como fue presentado: (cik, ticker, campo, tag, unidad, inicio, cierre, valor,
 formulario, fy, fp, fecha de presentación, accn). El campo `filed` permite reconstruir qué sabía el
 mercado en cada fecha (sin look-ahead): para una fecha D, usar solo filas con filed <= D.
-Desde 2012 en adelante (fecha de cierre).
+Desde 2005 en adelante (fecha de cierre); en la práctica, desde 2007.
 """
 import os
 import sys
@@ -17,7 +17,7 @@ import sec
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "data", "pit", "facts.parquet")
 UNIVERSO = os.path.join(ROOT, "data", "universo", "constituents.csv")
-DESDE = "2012-01-01"
+DESDE = "2005-01-01"   # el primer 10-K en XBRL (FY2009) trae comparativos desde 2007
 
 # campo normalizado -> tags XBRL en orden de prioridad (se guardan todos; la prioridad se aplica al usar)
 CAMPOS = {
