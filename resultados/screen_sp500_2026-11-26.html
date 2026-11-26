@@ -82,6 +82,12 @@ td.r, th.r { text-align: right; }
 .q1 { background: var(--buy-bg); color: var(--buy); font-weight: 600; } .q5 { background: var(--sell-bg); color: var(--sell); }
 tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); font-size: 12.5px; }
 .tablewrap { max-height: 72vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.prereg { max-width: 100%; }
+.prereg h3 { font-size: 14px; margin: 18px 0 6px; color: var(--accent); }
+.prereg p, .prereg li { max-width: 92ch; color: var(--ink); }
+.prereg ul { margin: 4px 0; padding-left: 20px; display: grid; gap: 4px; }
+.prereg code { font-family: var(--f-num); font-size: 12px; background: var(--accent-soft); padding: 1px 4px; border-radius: 4px; }
+table.md { margin: 6px 0; width: auto; } table.md td, table.md th { white-space: normal; }
 .foot { font-size: 12px; color: var(--muted); display: grid; gap: 6px; max-width: 90ch; }
 @media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .count:last-child { grid-column: span 2; } }
@@ -123,6 +129,30 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
       es value puro. El backtest exige que el método gane también dentro de cada nivel de múltiplo (ver PREREGISTRO.md).</p>
     <div class="scroll"><table id="sesgo"><thead><tr><th>Ranking</th><th class="r">Correlación con value</th>
       <th>Q1 en el quintil más barato</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="panel prereg" id="preregistro">
+    <h2>Pre-registro del backtest</h2>
+    <p class="note" style="margin:0 0 4px">Diseño y criterio de éxito fijados antes de ver cualquier resultado (PREREGISTRO.md).
+      Si cambia después de ver resultados, la prueba deja de valer.</p>
+    <p>Fijado el 2026-11-26, <b>antes de ver cualquier resultado del backtest</b>. Cambiar algo de este archivo después de ver resultados invalida la prueba: si se cambia, se anota la fecha, el motivo y que fue posterior.</p>
+<h3>Pregunta</h3>
+<p>¿El quintil de mayor brecha de expectativas le gana al SPY después de costos, y no se explica solo por value?</p>
+<h3>Estrategia principal (la única que decide)</h3>
+<ul><li><b>Métrica:</b> brecha = valor por acción / precio - 1, con crecimiento año 1 = consenso y desaceleración lineal hasta la mediana del base rate de su tamaño y crecimiento previo en el año 10; residual NOPAT/WACC.</li><li><b>Cartera:</b> quintil 1 de brecha, pesos iguales. Excluye las marcadas <code>[revisar]</code>.</li><li><b>Universo:</b> en cada fecha, las compañías que estaban en el S&amp;P 500 en esa fecha (composición histórica) <b>y que siguen cotizando hoy</b>. Las deslistadas (quiebras, compras, fusiones) quedan afuera porque no hay precios gratis de ellas (decisión del usuario, 2026-11-26).</li><li><b>Rebalanceo:</b> anual. <i>Propuesto, a confirmar por el usuario antes de correr.</i></li><li><b>Costos:</b> 20 pb por lado sobre el volumen operado. <i>Propuesto, a confirmar.</i></li><li><b>Período:</b> desde que la base point-in-time permite calcular la métrica (fundamentals SEC desde 2012).</li><li><b>Referencia:</b> SPY con dividendos reinvertidos.</li></ul>
+<h3>Sesgo de supervivencia (aceptado)</h3>
+<p>Sin las deslistadas, todos los quintiles se ven mejor que en la realidad: faltan las que quebraron o cayeron fuerte. El sesgo probablemente favorece más al Q1, porque las que parecen baratas son las que más seguido terminan mal. Para acotarlo:</p>
+<ul><li>Se reporta, además del SPY, el <b>promedio con pesos iguales del mismo universo</b> (que tiene el mismo sesgo). Que el Q1 le gane a ese promedio es la comparación más limpia.</li><li>Se reporta cuántas compañías del índice histórico quedan afuera por año.</li><li>Si el resultado depende de un margen chico, se considera no concluyente hasta testear con deslistadas.</li></ul>
+<h3>Criterio de éxito (las dos condiciones)</h3>
+<ul><li><b>Le gana al SPY:</b> retorno del Q1 después de costos &gt; SPY en la mayoría de los años calendario.</li><li><b>No es solo value:</b><ul><li>a. Alfa positivo con t ≥ 2 (Newey-West) en la regresión contra Fama-French 5 + momentum (incluye HML).</li><li>b. Doble orden: dentro de cada quintil de rendimiento operativo (NOPAT/EV), el Q1 de brecha le gana al Q5 en promedio y en al menos 3 de los 5 quintiles.</li></ul></li></ul>
+<h3>Variantes secundarias (se reportan, no deciden)</h3>
+<ul><li>Brecha con desaceleración a 4% fijo (versión anterior).</li><li>P(base rate) del crecimiento implícito.</li><li>Brecha neutral por sector (quintiles dentro de cada sector).</li></ul>
+<h3>Diagnóstico previo (corrida del 2026-11-26, sin retornos)</h3>
+<p>Correlación de rangos con el rendimiento operativo (1 = value puro):</p>
+<div class="scroll"><table class="md"><thead><tr><th>Variante</th><th>Correlación</th><th>Q1 en el quintil más barato</th></tr></thead><tbody><tr><td>Brecha (base rate), principal</td><td>0,76</td><td>69%</td></tr><tr><td>Brecha (4% fijo)</td><td>0,77</td><td>67%</td></tr><tr><td>P(base rate)</td><td>0,77</td><td>61%</td></tr><tr><td>Brecha neutral por sector</td><td>0,61</td><td>56%</td></tr><tr><td>Brecha dentro de cada nivel de múltiplo</td><td>0,05</td><td>20% (por construcción)</td></tr></tbody></table></div>
+<p>La métrica principal está muy cargada de value: la condición 2 es exigente y es la que va a decidir.</p>
+<h3>Cambios a este pre-registro</h3>
+<div class="scroll"><table class="md"><thead><tr><th>Fecha</th><th>Cambio</th><th>¿Antes de ver resultados?</th></tr></thead><tbody><tr><td>2026-11-26</td><td>Universo sin deslistadas; se agrega como referencia el promedio con pesos iguales del universo.</td><td>Sí</td></tr></tbody></table></div>
   </section>
 
   <section class="panel">

@@ -7,7 +7,9 @@ La recomendación usa los mismos umbrales que el Excel (Criterios): COMPRA si br
 REVISAR DATOS si la nota tiene [revisar] o el valor sin crecimiento supera 150% del EV.
 """
 import datetime as dt
+import html as H
 import json
+import re
 import math
 import os
 
@@ -34,6 +36,64 @@ def _num(x, nd=4):
     if x is None or (isinstance(x, float) and (math.isnan(x) or math.isinf(x))):
         return None
     return round(float(x), nd)
+
+
+def _inline(t):
+    t = H.escape(t, quote=False)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+    t = re.sub(r"(?<![*\w])\*(?!\s)(.+?)\*(?!\w)", r"<i>\1</i>", t)
+    return re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+
+
+def md_a_html(md):
+    """Markdown mínimo de PREREGISTRO.md: títulos, párrafos, listas (2 niveles) y tablas."""
+    out, i, L = [], 0, md.splitlines()
+    while i < len(L):
+        ln = L[i]
+        if ln.startswith("# "):
+            i += 1
+            continue                      # el título va en el encabezado de la sección
+        if ln.startswith("## "):
+            out.append(f"<h3>{_inline(ln[3:])}</h3>")
+        elif ln.startswith("|"):
+            filas = []
+            while i < len(L) and L[i].startswith("|"):
+                if not re.match(r"^\|[\s:|-]+\|$", L[i]):
+                    filas.append([c.strip() for c in L[i].strip("|").split("|")])
+                i += 1
+            th = "".join(f"<th>{_inline(c)}</th>" for c in filas[0])
+            tb = "".join("<tr>" + "".join(f"<td>{_inline(c)}</td>" for c in f) + "</tr>" for f in filas[1:])
+            out.append(f'<div class="scroll"><table class="md"><thead><tr>{th}</tr></thead><tbody>{tb}</tbody></table></div>')
+            continue
+        elif re.match(r"^\s*(- |\d+\. )", ln):
+            items = []
+            while i < len(L) and (re.match(r"^\s*(- |\d+\. )", L[i]) or (L[i].startswith("  ") and L[i].strip())):
+                m = re.match(r"^(\s*)(- |\d+\. )(.*)", L[i])
+                if m:
+                    items.append([len(m.group(1)), m.group(3)])
+                else:
+                    items[-1][1] += " " + L[i].strip()
+                i += 1
+            html, nivel = "<ul>", 0
+            for ind, txt in items:
+                n = 1 if ind >= 2 else 0
+                if n > nivel:
+                    html = html[:-5] + "<ul>"
+                elif n < nivel:
+                    html += "</ul></li>"
+                html += f"<li>{_inline(txt)}</li>"
+                nivel = n
+            html += "</ul></li>" * nivel + "</ul>"
+            out.append(html)
+            continue
+        elif ln.strip():
+            par = [ln.strip()]
+            while i + 1 < len(L) and L[i + 1].strip() and not re.match(r"^(#|\||\s*- |\s*\d+\. )", L[i + 1]):
+                i += 1
+                par.append(L[i].strip())
+            out.append(f"<p>{_inline(' '.join(par))}</p>")
+        i += 1
+    return "\n".join(out)
 
 
 def datos():
@@ -147,6 +207,12 @@ td.r, th.r { text-align: right; }
 .q1 { background: var(--buy-bg); color: var(--buy); font-weight: 600; } .q5 { background: var(--sell-bg); color: var(--sell); }
 tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); font-size: 12.5px; }
 .tablewrap { max-height: 72vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.prereg { max-width: 100%; }
+.prereg h3 { font-size: 14px; margin: 18px 0 6px; color: var(--accent); }
+.prereg p, .prereg li { max-width: 92ch; color: var(--ink); }
+.prereg ul { margin: 4px 0; padding-left: 20px; display: grid; gap: 4px; }
+.prereg code { font-family: var(--f-num); font-size: 12px; background: var(--accent-soft); padding: 1px 4px; border-radius: 4px; }
+table.md { margin: 6px 0; width: auto; } table.md td, table.md th { white-space: normal; }
 .foot { font-size: 12px; color: var(--muted); display: grid; gap: 6px; max-width: 90ch; }
 @media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .count:last-child { grid-column: span 2; } }
@@ -188,6 +254,13 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
       es value puro. El backtest exige que el método gane también dentro de cada nivel de múltiplo (ver PREREGISTRO.md).</p>
     <div class="scroll"><table id="sesgo"><thead><tr><th>Ranking</th><th class="r">Correlación con value</th>
       <th>Q1 en el quintil más barato</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section class="panel prereg" id="preregistro">
+    <h2>Pre-registro del backtest</h2>
+    <p class="note" style="margin:0 0 4px">Diseño y criterio de éxito fijados antes de ver cualquier resultado (PREREGISTRO.md).
+      Si cambia después de ver resultados, la prueba deja de valer.</p>
+    __PREREGISTRO__
   </section>
 
   <section class="panel">
@@ -359,7 +432,8 @@ tr.detail td { white-space: normal; background: var(--bg); color: var(--muted); 
 
 def main():
     d = datos()
-    html = PLANTILLA.replace("__DATOS__", json.dumps(d, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
+    pre = md_a_html(open(os.path.join(ROOT, "PREREGISTRO.md"), encoding="utf-8").read())
+    html = PLANTILLA.replace("__PREREGISTRO__", pre).replace("__DATOS__", json.dumps(d, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
     path = os.path.join(ROOT, "resultados", f"screen_sp500_{dt.date.today():%Y-%m-%d}.html")
     with open(path, "w") as f:
         f.write(html)

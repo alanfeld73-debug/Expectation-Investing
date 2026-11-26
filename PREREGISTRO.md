@@ -9,12 +9,23 @@ de ver resultados invalida la prueba: si se cambia, se anota la fecha, el motivo
 ## Estrategia principal (la única que decide)
 - **Métrica:** brecha = valor por acción / precio - 1, con crecimiento año 1 = consenso y desaceleración lineal
   hasta la mediana del base rate de su tamaño y crecimiento previo en el año 10; residual NOPAT/WACC.
-- **Cartera:** quintil 1 de brecha, pesos iguales, dentro del universo S&P 500 vigente en cada fecha
-  (composición histórica, sin sesgo de supervivencia). Excluye las marcadas `[revisar]`.
+- **Cartera:** quintil 1 de brecha, pesos iguales. Excluye las marcadas `[revisar]`.
+- **Universo:** en cada fecha, las compañías que estaban en el S&P 500 en esa fecha (composición histórica)
+  **y que siguen cotizando hoy**. Las deslistadas (quiebras, compras, fusiones) quedan afuera porque no hay
+  precios gratis de ellas (decisión del usuario, 2026-11-26).
 - **Rebalanceo:** anual. *Propuesto, a confirmar por el usuario antes de correr.*
 - **Costos:** 20 pb por lado sobre el volumen operado. *Propuesto, a confirmar.*
 - **Período:** desde que la base point-in-time permite calcular la métrica (fundamentals SEC desde 2012).
 - **Referencia:** SPY con dividendos reinvertidos.
+
+## Sesgo de supervivencia (aceptado)
+Sin las deslistadas, todos los quintiles se ven mejor que en la realidad: faltan las que quebraron o cayeron
+fuerte. El sesgo probablemente favorece más al Q1, porque las que parecen baratas son las que más seguido terminan
+mal. Para acotarlo:
+- Se reporta, además del SPY, el **promedio con pesos iguales del mismo universo** (que tiene el mismo sesgo).
+  Que el Q1 le gane a ese promedio es la comparación más limpia.
+- Se reporta cuántas compañías del índice histórico quedan afuera por año.
+- Si el resultado depende de un margen chico, se considera no concluyente hasta testear con deslistadas.
 
 ## Criterio de éxito (las dos condiciones)
 1. **Le gana al SPY:** retorno del Q1 después de costos > SPY en la mayoría de los años calendario.
@@ -40,3 +51,8 @@ Correlación de rangos con el rendimiento operativo (1 = value puro):
 | Brecha dentro de cada nivel de múltiplo | 0,05 | 20% (por construcción) |
 
 La métrica principal está muy cargada de value: la condición 2 es exigente y es la que va a decidir.
+
+## Cambios a este pre-registro
+| Fecha | Cambio | ¿Antes de ver resultados? |
+|---|---|---|
+| 2026-11-26 | Universo sin deslistadas; se agrega como referencia el promedio con pesos iguales del universo. | Sí |
