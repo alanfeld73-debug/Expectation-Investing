@@ -91,14 +91,21 @@ def metricas_compania(as_of=None):
             continue
         last = g.iloc[-1]
         win = g[g.end > last.end - pd.DateOffset(years=YEARS, days=45)]
-        r = dict(ticker=t, fy_end=last.end, ventas_fy=last.revenue, ebit_fy=last.ebit)
+        r = dict(ticker=t, fy_end=last.end, ventas_fy=last.revenue, ebit_fy=last.ebit, ni_fy=last.net_income)
+        prev = _cerca(g, last.end - pd.DateOffset(years=1))
+        if prev is not None and prev.revenue > 0:
+            r["g_fy"] = float(last.revenue / prev.revenue - 1)
         # Tasa impositiva
         w = win.dropna(subset=["tax", "pretax"])
         if len(w) >= 3 and w.pretax.sum() > 0:
             r["tax_rate"] = float(np.clip(w.tax.sum() / w.pretax.sum(), *TAX_CLIP))
             r["tax_n"] = len(w)
-        # Tasa de inversión incremental (ventana de 5 años: inicio = cierre 5 años antes)
-        ini = _cerca(g, last.end - pd.DateOffset(years=YEARS))
+        # Tasa de inversión incremental: ventana de 5 años (o 4 o 3 si no hay historia suficiente)
+        ini, k = None, YEARS
+        for k in range(YEARS, 2, -1):
+            ini = _cerca(g, last.end - pd.DateOffset(years=k))
+            if ini is not None:
+                break
         if ini is not None:
             yrs = g[(g.end > ini.end) & (g.end <= last.end)]
             ds = last.revenue - ini.revenue
@@ -109,10 +116,11 @@ def metricas_compania(as_of=None):
             nwc = lambda x: ((x.assets_cur - (0 if pd.isna(x.cash) else x.cash) - (0 if pd.isna(x.st_invest) else x.st_invest))
                              - (x.liab_cur - (0 if pd.isna(x.debt_cur) else x.debt_cur)))
             dnwc = nwc(last) - nwc(ini)
-            if ds > MIN_DSALES * ini.revenue and capex_neto.notna().sum() >= YEARS - 1:
+            if ds > MIN_DSALES * ini.revenue and capex_neto.notna().sum() >= k - 1:
                 inv = capex_neto.sum() + (dnwc if pd.notna(dnwc) else 0.0)
                 r["inv_rate"] = float(np.clip(inv / ds, *INV_CLIP))
                 r["inv_sin_nwc"] = bool(pd.isna(dnwc))
+            r["inv_anios"] = k
             r["ma_5a"] = float(yrs.acquisitions.sum()) if yrs.acquisitions.notna().any() else 0.0
             r["dventas_5a"] = float(ds)
         # CAGR de ventas 3 años (crecimiento previo para base rates)
@@ -121,3 +129,17 @@ def metricas_compania(as_of=None):
             r["cagr3"] = float((last.revenue / i3.revenue) ** (1 / 3) - 1)
         out.append(r)
     return pd.DataFrame(out)
+
+
+def ultimo_saldo(campo, as_of):
+    """Último saldo (dato instantáneo) por ticker presentado hasta as_of, de 10-K o 10-Q. Si hay varios tags
+    para la misma fecha de cierre, gana el de mayor prioridad. Devuelve Serie ticker -> valor."""
+    d = facts()
+    d = d[(d.campo == campo) & d.start.isna() & (d.filed <= pd.Timestamp(as_of))
+          & d.form.isin(ANNUAL_FORMS | {"10-Q", "10-Q/A"})]
+    if d.empty:
+        return pd.Series(dtype=float)
+    prio = {t: i for i, t in enumerate(CAMPOS.get(campo, ["EntityCommonStockSharesOutstanding"]))}
+    d = d.assign(prio=d.tag.map(prio).fillna(99))
+    d = d.sort_values(["ticker", "end", "prio", "filed"], ascending=[True, False, True, False])
+    return d.drop_duplicates("ticker").set_index("ticker").val

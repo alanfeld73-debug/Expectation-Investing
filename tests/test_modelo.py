@@ -152,3 +152,25 @@ def test_factores_parsea_formato_french():
     df = FF._parse_mensual(txt)
     assert list(df.columns) == ["Mkt-RF", "SMB", "HML", "RF"] and len(df) == 2
     assert df.iloc[0]["Mkt-RF"] == pytest.approx(0.01)
+
+
+def test_backtest_cartera_pesos_iguales_deriva_y_costos():
+    import pandas as pd
+    import backtest as B
+    idx = pd.period_range("2020-04", periods=4, freq="M")
+    R = pd.DataFrame({"A": [None, 0.10, 0.00, 0.10], "B": [None, 0.00, 0.00, -0.10]}, index=idx)
+    s = B.cartera(R, [(idx[0], ["A", "B"])], "x")
+    # Mes 1: (10% + 0%) / 2 = 5%, menos 20 pb de costo por comprar el 100% de la cartera
+    assert s.iloc[0] == pytest.approx(0.998 * 1.05 - 1)
+    # Mes 3: pesos derivados A = 1,1 / 2,1 y B = 1 / 2,1
+    assert s.iloc[2] == pytest.approx((1.1 * 0.10 + 1.0 * -0.10) / 2.1)
+
+
+def test_backtest_costo_por_rotacion():
+    import pandas as pd
+    import backtest as B
+    idx = pd.period_range("2020-04", periods=3, freq="M")
+    R = pd.DataFrame({"A": [None, 0.0, 0.0], "B": [None, 0.0, 0.0]}, index=idx)
+    s = B.cartera(R, [(idx[0], ["A"]), (idx[1], ["B"])], "x")
+    # Segundo rebalanceo: vende 100% de A y compra 100% de B -> volumen 2 x 20 pb = 40 pb
+    assert s.iloc[1] == pytest.approx(-0.004)

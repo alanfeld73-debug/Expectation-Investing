@@ -84,8 +84,18 @@ def universo():
     return u[["ticker", "nombre", "sector", "subindustria", "cik"]]
 
 
+def universo_completo():
+    """Lista actual + universo histórico del backtest (si existe), sin duplicados."""
+    u = universo()[["ticker", "cik"]]
+    bt = os.path.join(ROOT, "data", "universo", "universo_bt.csv")
+    if os.path.exists(bt):
+        b = pd.read_csv(bt).dropna(subset=["ticker"])[["ticker", "cik"]]
+        u = pd.concat([u, b]).drop_duplicates("ticker")
+    return u.astype({"cik": int})
+
+
 def main():
-    u = universo()
+    u = universo_completo()
     rows, fallas = [], []
     for i, r in enumerate(u.itertuples(), 1):
         try:

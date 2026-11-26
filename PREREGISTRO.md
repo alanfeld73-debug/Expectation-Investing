@@ -9,6 +9,9 @@ de ver resultados invalida la prueba: si se cambia, se anota la fecha, el motivo
 ## Estrategia principal (la única que decide)
 - **Métrica:** brecha = valor por acción / precio - 1, con crecimiento año 1 = consenso y desaceleración lineal
   hasta la mediana del base rate de su tamaño y crecimiento previo en el año 10; residual NOPAT/WACC.
+- **En el backtest el consenso se reemplaza** por el crecimiento real de ventas del último ejercicio conocido a la
+  fecha (SEC, con fecha de presentación): no hay consenso histórico gratis. Medido el 2026-11-26, el ranking con uno u
+  otro tiene correlación 0,91 y comparte el 80% del quintil 1 (aprobado por el usuario).
 - **Cartera:** quintil 1 de brecha, pesos iguales. Excluye las marcadas `[revisar]`.
 - **Universo:** en cada fecha, las compañías que estaban en el S&P 500 en esa fecha (composición histórica)
   **y que siguen cotizando hoy**. Las deslistadas (quiebras, compras, fusiones) quedan afuera porque no hay
@@ -57,3 +60,4 @@ La métrica principal está muy cargada de value: la condición 2 es exigente y 
 |---|---|---|
 | 2026-11-26 | Universo sin deslistadas; se agrega como referencia el promedio con pesos iguales del universo. | Sí |
 | 2026-11-26 | Rebalanceo anual y costos de 20 pb por lado confirmados por el usuario. | Sí |
+| 2026-11-26 | En el backtest, consenso año 1 reemplazado por el crecimiento real de ventas del último ejercicio (SEC). | Sí |
