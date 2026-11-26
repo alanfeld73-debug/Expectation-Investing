@@ -20,13 +20,17 @@ Métricas por compañía:
   ss_share   % del EV explicado por el valor sin crecimiento (NOPAT0 / WACC)
 """
 import csv
+import datetime as dt
 import json
+import os
 import urllib.request
 from dataclasses import dataclass, field
 
 from scipy.optimize import brentq
 
-RF, ERP, G_TERMINAL, H = 0.0485, 0.05, 0.04, 10
+RF, ERP, G_TERMINAL, H = 0.0485, 0.05, 0.04, 10   # RF: UST 10 años (fecha de toma: ver SUPUESTOS.md)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(ROOT, "data")
 
 TICKERS = {
     # ticker: (símbolo TradingView, modelo)
@@ -85,7 +89,23 @@ COLS = ["close", "market_cap_basic", "total_revenue_ttm", "total_revenue_fy", "o
         "beta_5_year", "revenue_forecast_next_fy", "total_equity_fq", "total_revenue_yoy_growth_ttm"]
 
 
-def tv_scan(symbols):
+def tv_scan(symbols, refresh=False):
+    """Scanner de TradingView con caché diario en data/tv_scan_AAAA-MM-DD.json."""
+    os.makedirs(DATA, exist_ok=True)
+    path = os.path.join(DATA, f"tv_scan_{dt.date.today():%Y-%m-%d}.json")
+    cache = {}
+    if os.path.exists(path):
+        with open(path) as f:
+            cache = json.load(f)
+    missing = [s for s in symbols if s not in cache]
+    if missing or refresh:
+        cache.update(_tv_fetch(symbols if refresh else missing))
+        with open(path, "w") as f:
+            json.dump(cache, f, indent=1)
+    return cache
+
+
+def _tv_fetch(symbols):
     body = json.dumps({"symbols": {"tickers": symbols}, "columns": COLS}).encode()
     req = urllib.request.Request("https://scanner.tradingview.com/global/scan", data=body,
                                  headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"})
@@ -209,6 +229,9 @@ def build(t, sym, model, d):
     flags = []
     sales = d["total_revenue_ttm"] or d["total_revenue_fy"]
     ebit = d["oper_income_ttm"] if d["oper_income_ttm"] is not None else d["oper_income_fy"]
+    for k, v in (("close", d["close"]), ("market_cap_basic", d["market_cap_basic"]), ("ventas", sales), ("EBIT", ebit)):
+        if v is None:
+            raise ValueError(f"{t}: falta {k} en TradingView")
     if d["total_revenue_ttm"] is None:
         flags.append("sin TTM")
     sales += a.get("adj_rev", 0)
@@ -255,7 +278,14 @@ def main():
     raw = tv_scan([s for s, _ in TICKERS.values()])
     rows, cos = [], {}
     for t, (sym, model) in TICKERS.items():
-        c = build(t, sym, model, raw[sym])
+        if sym not in raw:
+            print(f"[screen] {t}: {sym} no vino en el scan de TradingView, se omite")
+            continue
+        try:
+            c = build(t, sym, model, raw[sym])
+        except ValueError as e:
+            print(f"[screen] {e}, se omite")
+            continue
         cos[t] = c
         gi = c.implied_g()
         v = c.value_per_share(c.fade_path())
@@ -276,12 +306,12 @@ def main():
         print(f"{r['ticker']:6}{r['modelo']:7}{r['precio']:9.2f}{r['ev_bn']:8.1f}{pct(r['wacc'])}"
               f"{pct(r['ss_share'])}  {pct(r['g_impl'])}{pct(r['p_base_rate'])}{pct(r['g_ref'])}"
               f"{mf} {r['v_fade']:8.2f}{pct(r['upside'])}")
-    v = raw["NYSE:VIST"]
-    ev = v["market_cap_basic"] + v["total_debt_fq"] - v["cash_n_short_term_invest_fq"]
-    print("\nVIST — precio realizado de petróleo implícito (producción 170 kboe/d plana):")
-    for w in (0.10, cos["VIST"].wacc, 0.13):
-        print(f"   WACC {w:.1%}: USD {vist_implied_oil(ev, w):.1f}/bbl")
-    with open("screen_output.csv", "w", newline="") as f:
+    if "VIST" in cos:
+        ev = cos["VIST"].ev
+        print("\nVIST — precio realizado de petróleo implícito (producción 170 kboe/d plana):")
+        for w in (0.10, cos["VIST"].wacc, 0.13):
+            print(f"   WACC {w:.1%}: USD {vist_implied_oil(ev, w):.1f}/bbl")
+    with open(os.path.join(DATA, "screen_output.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
