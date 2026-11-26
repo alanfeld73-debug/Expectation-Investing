@@ -12,7 +12,6 @@ todo cambio a ellos se anota acá.
 
 ## Pendientes de definir
 - Rf = 4,85% está fijo en el código sin fecha de toma. Hay que actualizarlo y anotar la fecha.
-- SEC_USER_AGENT: definir el mail de contacto de Criteria.
 - Prima de riesgo país: hoy va ad hoc por compañía (`crp` en `A`), sin tabla por país.
 
 ## Historial
@@ -23,3 +22,5 @@ todo cambio a ellos se anota acá.
 | 2026-11-26 | baserates: el caché solo escribe cuando la descarga terminó; ignora archivos vacíos. | Bug: una descarga fallida dejaba un JSON vacío que bloqueaba los reintentos. |
 | 2026-11-26 | baserates: User-Agent desde SEC_USER_AGENT (se sacó el mail hardcodeado); caché en data/sec_frames; sin descarga al importar. | El brief pide el mail de Criteria y caché en data/. |
 | 2026-11-26 | screen: scan de TradingView cacheado por día en data/; omite tickers con campos faltantes en vez de cortar la corrida; salida en data/screen_output.csv. | Robustez y caché. |
+| 2026-11-26 | reverse_dcf.py v0.1 importado (caso BKNG). User-Agent de la SEC centralizado en src/config.py. | Archivo faltante; un solo lugar para el contacto. |
+| 2026-11-26 | Test de consistencia: reverse_dcf y screen dan el mismo valor operativo con los mismos inputs. | Evitar que los dos motores diverjan. |

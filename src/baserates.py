@@ -2,7 +2,7 @@
 Fuente: SEC XBRL frames (todas las compañías que reportan a la SEC), CY2015 -> CY2025.
 Sesgo de supervivencia: solo entran compañías que siguen reportando en 2025.
 
-User-Agent de la SEC: variable de entorno SEC_USER_AGENT (p.ej. "Criteria Research mail@dominio").
+User-Agent de la SEC: config.SEC_USER_AGENT (sobreescribible por variable de entorno).
 Caché: data/sec_frames/ en la raíz del proyecto."""
 import glob
 import json
@@ -21,10 +21,8 @@ PRIOR = [(-1, 0), (0, 0.05), (0.05, 0.10), (0.10, 0.20), (0.20, 10)]
 
 
 def _user_agent():
-    ua = os.environ.get("SEC_USER_AGENT")
-    if not ua:
-        raise RuntimeError("Definir SEC_USER_AGENT (nombre + mail de contacto) antes de descargar de la SEC.")
-    return ua
+    from config import SEC_USER_AGENT
+    return SEC_USER_AGENT
 
 
 def _download():

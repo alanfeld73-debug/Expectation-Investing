@@ -63,3 +63,13 @@ def test_base_rates_no_usa_bucket_megacap_para_microcaps():
     import baserates  # importar no debe descargar nada
     assert baserates.prob(5e7, 0.10) == (None, 0, None)
     assert baserates.bucket(3e8) == (1e8, 5e8)
+
+
+def test_reverse_dcf_y_screen_dan_el_mismo_valor():
+    import reverse_dcf as R
+    i = R.BKNG
+    c = co(sales0=i.sales0, m0=i.ebit_margin, m_target=i.ebit_margin, tax=i.tax, inv=i.inv_rate, wacc=i.wacc)
+    for g in (0.0, 0.05, 0.10):
+        assert c.op_value([g] * E.H) == pytest.approx(R.operating_value(i, g))
+    g = R.implied_growth(i)
+    assert R.operating_value(i, g) == pytest.approx(i.target_op_value, rel=1e-6)
