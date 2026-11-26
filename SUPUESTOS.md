@@ -11,7 +11,6 @@ todo cambio a ellos se anota acá.
 - Modelos FCF / RAMP / EQUITY.
 
 ## Pendientes de definir
-- Rf = 4,85% está fijo en el código sin fecha de toma. Hay que actualizarlo y anotar la fecha.
 - Prima de riesgo país: hoy va ad hoc por compañía (`crp` en `A`), sin tabla por país.
 
 ## Historial
@@ -24,3 +23,6 @@ todo cambio a ellos se anota acá.
 | 2026-11-26 | screen: scan de TradingView cacheado por día en data/; omite tickers con campos faltantes en vez de cortar la corrida; salida en data/screen_output.csv. | Robustez y caché. |
 | 2026-11-26 | reverse_dcf.py v0.1 importado (caso BKNG). User-Agent de la SEC centralizado en src/config.py. | Archivo faltante; un solo lugar para el contacto. |
 | 2026-11-26 | Test de consistencia: reverse_dcf y screen dan el mismo valor operativo con los mismos inputs. | Evitar que los dos motores diverjan. |
+| 2026-11-26 | Rf = UST 10 años de FRED (DGS10), con fecha en la salida y caché en data/rates. Primera toma: 4,91% al 2026-11-24 (antes 4,85% fijo). Sin red usa el caché; sin caché, 4,85% marcado como respaldo. | Aprobado por el usuario (pregunta 2). |
+| 2026-11-26 | Crecimiento previo para base rates = CAGR de ventas de 3 ejercicios desde la SEC (10-K/20-F/40-F, us-gaap o ifrs-full, moneda de reporte). Antes: crecimiento interanual TTM de TradingView. Si no hay datos en la SEC (TOYO, CTEK, GGGOF, RX, VU), se usa solo el tamaño y se marca en la nota. | Aprobado por el usuario (pregunta 1): alinea con el prior de los buckets (CAGR 2012-15). |
+| 2026-11-26 | Mapa ticker->CIK propio en data/sec/cik_map.json (desde company_tickers.json) con overrides en sec.CIK_MANUAL. | Brief: www.sec.gov puede bloquearse. |

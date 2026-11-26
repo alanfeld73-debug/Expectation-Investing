@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 
 from scipy.optimize import brentq
 
-RF, ERP, G_TERMINAL, H = 0.0485, 0.05, 0.04, 10   # RF: UST 10 años (fecha de toma: ver SUPUESTOS.md)
+# RF se actualiza en main() con FRED DGS10 (rates.rf10); 4,85% es solo el valor por defecto para tests.
+RF, ERP, G_TERMINAL, H = 0.0485, 0.05, 0.04, 10
+RF_DATE = None
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 
@@ -255,7 +257,7 @@ def build(t, sym, model, d):
     g_ref = max(min(g_ref, 0.60), -0.10)
     ni0 = a.get("ni", d["net_income_ttm"] or 0)
     roe = a.get("roe_inc", (d["net_income_ttm"] or 0) / (d["total_equity_fq"] or 1))
-    g_hist = (d["total_revenue_yoy_growth_ttm"] or 0) / 100
+    g_hist = None   # crecimiento previo para base rates: CAGR 3 años de la SEC, se completa en main()
     return Co(t=t, model="EQUITY" if model == "EQUITY" else "FCF", price=d["close"], mcap=mcap,
               sales0=sales, m0=ebit / (sales / a.get("driver_ratio", 1)) / a.get("driver_ratio", 1),
               tax=a.get("tax", 0.21), inv=a.get("inv", 0.1),
@@ -274,7 +276,12 @@ def vist_implied_oil(ev, wacc, prod_kboed=170, ebitda_per_boe_per_usd=0.645, da_
 
 
 def main():
+    global RF, RF_DATE
+    import rates
+    import sec
     from baserates import prob
+    RF, RF_DATE, rf_src = rates.rf10()
+    print(f"Rf (UST 10 años) = {RF:.2%} al {RF_DATE} [{rf_src}]")
     raw = tv_scan([s for s, _ in TICKERS.values()])
     rows, cos = [], {}
     for t, (sym, model) in TICKERS.items():
@@ -290,13 +297,16 @@ def main():
         gi = c.implied_g()
         v = c.value_per_share(c.fade_path())
         p_br = None
+        c.g_hist = sec.revenue_cagr(t, 3)
         if gi is not None and c.model == "FCF" and A[t].get("driver_ratio") is None:
             p_br = prob(c.sales0, gi, c.g_hist)[0]
+            if c.g_hist is None:
+                c.flags.append("base rate solo por tamaño (sin CAGR 3a en SEC)")
         rows.append(dict(
             ticker=t, modelo=model, precio=c.price, ev_bn=c.target / 1e9,
             wacc=c.ke if c.model == "EQUITY" else c.wacc, ss_share=c.steady_state_share(),
-            g_impl=gi, p_base_rate=p_br, g_ref=c.g_ref, mifp=c.mifp(),
-            v_fade=v, upside=v / c.price - 1, nota="; ".join(c.flags + ([c.note] if c.note else []))))
+            g_impl=gi, g_hist3=c.g_hist, p_base_rate=p_br, g_ref=c.g_ref, mifp=c.mifp(),
+            v_fade=v, upside=v / c.price - 1, rf=RF, rf_fecha=RF_DATE, nota="; ".join(c.flags + ([c.note] if c.note else []))))
     rows.sort(key=lambda r: r["upside"], reverse=True)
     pct = lambda x: "   n/a" if x is None else f"{x:6.1%}"
     print(f"{'Tk':6}{'Mod':7}{'Precio':>9}{'EV bn':>8}{'WACC':>7}{'SS%EV':>7}{'g_impl':>8}"

@@ -73,3 +73,20 @@ def test_reverse_dcf_y_screen_dan_el_mismo_valor():
         assert c.op_value([g] * E.H) == pytest.approx(R.operating_value(i, g))
     g = R.implied_growth(i)
     assert R.operating_value(i, g) == pytest.approx(i.target_op_value, rel=1e-6)
+
+
+def test_rates_parsea_ultimo_dato_valido():
+    import rates
+    assert rates._parse("observation_date,DGS10\n2026-11-21,4.90\n2026-11-24,4.91\n2026-11-25,\n") == \
+        (pytest.approx(0.0491), "2026-11-24")
+
+
+def test_sec_serie_anual_filtra_trimestres_y_usa_ultima_reexpresion():
+    import sec
+    items = [
+        dict(start="2022-01-01", end="2022-12-31", val=100, form="10-K", filed="2023-02-01"),
+        dict(start="2022-01-01", end="2022-12-31", val=105, form="10-K", filed="2024-02-01"),  # re-expresado
+        dict(start="2025-07-01", end="2025-09-30", val=40, form="10-Q", filed="2025-10-30"),    # trimestre
+        dict(start="2025-01-01", end="2025-12-31", val=140, form="10-K", filed="2026-02-01"),
+    ]
+    assert sec._annual_series(items) == {"2022-12-31": 105, "2025-12-31": 140}

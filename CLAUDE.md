@@ -25,6 +25,8 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/baserates.py`: distribución de crecimiento histórico (visión externa).
 - `src/escenarios.py`: pasos 2-3 (turbina, escenarios, regla de compra).
 - `src/reverse_dcf.py`: análisis individual con grilla de sensibilidad.
+- `src/sec.py`: SEC (mapa ticker->CIK, companyfacts, ventas anuales, CAGR) con caché.
+- `src/rates.py`: Rf desde FRED DGS10 con fecha y caché.
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 
