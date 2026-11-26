@@ -28,6 +28,10 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/sec.py`: SEC (mapa ticker->CIK, companyfacts, ventas anuales, CAGR) con caché.
 - `src/rates.py`: Rf desde FRED DGS10 con fecha y caché.
 - `src/exportar_excel.py`: Excel con colores por recomendación en resultados/ (screen + escenarios + criterios).
+- `src/pit.py`: base point-in-time de la SEC (data/pit/facts.parquet), con fecha de presentación.
+- `src/fundamentals.py`: series anuales con `as_of` (sin look-ahead), tasas impositiva y de inversión por compañía.
+- `src/defaults_sector.py`: defaults por sector GICS (medianas).
+- `src/screen_sp500.py` / `src/exportar_sp500.py`: corrida cruda del S&P 500 y su Excel.
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 

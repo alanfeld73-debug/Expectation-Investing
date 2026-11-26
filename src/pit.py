@@ -30,7 +30,11 @@ CAMPOS = {
     "tax": ["IncomeTaxExpenseBenefit"],
     "net_income": ["NetIncomeLoss", "ProfitLoss"],
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets",
-              "PaymentsForCapitalImprovements"],
+              "PaymentsToAcquireOilAndGasPropertyAndEquipment", "PaymentsToAcquireOilAndGasProperty"],
+    # Se suman al capex (son conceptos distintos, no alternativos):
+    "capex_sw": ["PaymentsToDevelopSoftware"],
+    "capex_re": ["PaymentsToAcquireRealEstate", "PaymentsToDevelopRealEstateAssets", "PaymentsForCapitalImprovements"],
+    "amort_intang": ["AmortizationOfIntangibleAssets"],
     "da": ["DepreciationDepletionAndAmortization", "DepreciationAndAmortization",
            "DepreciationAmortizationAndAccretionNet", "Depreciation"],
     "acquisitions": ["PaymentsToAcquireBusinessesNetOfCashAcquired"],
@@ -48,9 +52,18 @@ CAMPOS = {
 }
 TAG2CAMPO = {t: c for c, tags in CAMPOS.items() for t in tags}
 DEI = {"EntityCommonStockSharesOutstanding": "shares_out"}
+# CIK predecesores cuya historia se agrega al ticker actual (reorganizaciones bajo un holding nuevo).
+PREDECESORES = {"XOM": [34088]}   # 2026: Exxon Mobil pasó a un holding con CIK nuevo (2115436)
 
 
 def extraer(cik, ticker):
+    rows = []
+    for c in [cik] + PREDECESORES.get(ticker, []):
+        rows += _extraer_cik(c, ticker)
+    return rows
+
+
+def _extraer_cik(cik, ticker):
     facts = sec.companyfacts(cik)["facts"]
     rows = []
     for tax, mapa in (("us-gaap", TAG2CAMPO), ("dei", DEI)):

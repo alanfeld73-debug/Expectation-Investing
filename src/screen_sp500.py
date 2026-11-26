@@ -6,8 +6,8 @@ Fuentes: precios, TTM, beta, deuda/caja y consenso de TradingView; tasa impositi
 incremental = defaults por sector (medianas de la SEC, defaults_sector.py); crecimiento previo = CAGR
 3 años de la SEC; Rf = FRED DGS10. Sin overrides manuales: es la corrida "cruda" que la Semana 2 normaliza.
 
-Modelo: EQUITY para bancos, aseguradoras, brokers, consumer finance y holdings (sobre utilidad TTM, ROE
-TTM); FCF para el resto (incluye procesadores de pagos, bolsas/datos y brokers de seguros).
+Modelo: EQUITY para bancos, aseguradoras, brokers, consumer finance, holdings y utilities (sobre utilidad
+TTM, ROE TTM); FCF para el resto (incluye procesadores de pagos, bolsas/datos y brokers de seguros).
 Brecha = V_fade / precio - 1 (valor con consenso año 1 + fade a 4%, sobre precio). Quintil 1 = mayor brecha.
 """
 import datetime as dt
@@ -27,7 +27,14 @@ from pit import ROOT, universo
 EQUITY_SUBIND = {"Asset Management & Custody Banks", "Property & Casualty Insurance", "Diversified Banks",
                  "Investment Banking & Brokerage", "Regional Banks", "Life & Health Insurance",
                  "Consumer Finance", "Multi-line Insurance", "Multi-Sector Holdings", "Reinsurance"}
+# Utilities: el capex sigue a la base tarifaria, no a las ventas (tasa de inversión > 200%): se valúan como
+# los generadores, sobre utilidad y ROE regulado.
+EQUITY_SECTOR = {"Utilities"}
 SPREAD = 0.0125
+# Marcas que sacan a la compañía del ranking hasta normalizarla en la Semana 2 (prefijo "[revisar]").
+SALTO_TTM = 0.15      # TTM fuera del rango [último FY, consenso] por más de esto: posible M&A
+G_EXTREMO = 0.30      # consenso año 1 por encima de esto: hipercrecimiento o M&A
+SS_MAX = 1.50         # valor sin crecimiento / EV por encima de esto: dato sospechoso
 ROE_CLIP = (0.05, 0.30)
 TV_COLS = ["name"] + E.COLS
 
@@ -53,7 +60,7 @@ def tv_bulk(tickers):
 def construir(r, d, sec_def, co_m):
     """Arma el objeto Co del screen con defaults por sector. Devuelve (Co o None, flags)."""
     flags = []
-    model = "EQUITY" if r.subindustria in EQUITY_SUBIND else "FCF"
+    model = "EQUITY" if (r.subindustria in EQUITY_SUBIND or r.sector in EQUITY_SECTOR) else "FCF"
     sales = d.get("total_revenue_ttm") or d.get("total_revenue_fy")
     ebit = d.get("oper_income_ttm") if d.get("oper_income_ttm") is not None else d.get("oper_income_fy")
     price, mcap = d.get("close"), d.get("market_cap_basic")
@@ -74,7 +81,7 @@ def construir(r, d, sec_def, co_m):
         if not sales or ebit is None:
             return None, ["sin ventas/EBIT"]
         if ebit <= 0:
-            flags.append("EBIT ≤ 0: requiere RAMP manual")
+            flags.append("[revisar] EBIT ≤ 0: requiere RAMP manual")
         kd = (E.RF + SPREAD) * (1 - tax)
         wd = debt / (debt + mcap)
         wacc = (1 - wd) * ke + wd * kd
@@ -85,12 +92,20 @@ def construir(r, d, sec_def, co_m):
     else:
         g_ref = (d.get("total_revenue_yoy_growth_ttm") or 5) / 100
         flags.append("sin consenso: g_ref = crecimiento TTM")
+    # El TTM debería estar entre el último FY y el consenso del año en curso; si se aleja más de SALTO_TTM
+    # de ese rango, hay M&A, desinversión o un ítem no recurrente (el crecimiento orgánico rápido no se marca).
+    if fy and sales and model == "FCF":
+        salto = sales / fy - 1
+        if salto > max(g_ref, 0) + SALTO_TTM or salto < min(g_ref, 0) - SALTO_TTM:
+            flags.append(f"[revisar] TTM {salto:+.0%} vs último FY, consenso {g_ref:+.0%}: posible M&A")
+    if g_ref > G_EXTREMO:
+        flags.append(f"[revisar] consenso año 1 {g_ref:+.0%}: hipercrecimiento o M&A")
     g_ref = max(min(g_ref, 0.60), -0.10)
     # Conciliación TV vs SEC (ventas del último ejercicio)
     if co_m is not None and pd.notna(co_m.get("ventas_fy")) and sales and model == "FCF":
         ratio = sales / co_m["ventas_fy"]
         if not 0.85 <= ratio <= 1.6:
-            flags.append(f"conciliar ventas: TV TTM / SEC FY = {ratio:.2f}")
+            flags.append(f"[revisar] conciliar ventas: TV TTM / SEC FY = {ratio:.2f}")
     c = E.Co(t=r.ticker, model=model, price=price, mcap=mcap, sales0=sales or 0.0,
              m0=(ebit / sales) if sales and ebit is not None else 0.0, tax=tax, inv=inv, wacc=wacc, ke=ke,
              net_debt=net_debt, g_ref=g_ref, m_target=(ebit / sales) if sales and ebit is not None else 0.0,
@@ -120,6 +135,10 @@ def main():
             continue
         gi = c.implied_g() if c.m0 > 0 or c.model == "EQUITY" else None
         v = c.value_per_share(c.fade_path())
+        if v < 0:
+            flags.append("[revisar] valor negativo: deuda de financiera cautiva o leases")
+        if c.steady_state_share() > SS_MAX:
+            flags.append(f"[revisar] valor sin crecimiento = {c.steady_state_share():.0%} del EV")
         p_br = None
         if gi is not None and c.model == "FCF" and c.sales0 > 0:
             p_br = prob(c.sales0, gi, c.g_hist)[0]
@@ -130,7 +149,7 @@ def main():
                          g_impl=gi, g_hist3=c.g_hist, p_base_rate=p_br, g_ref=c.g_ref, mifp=c.mifp(),
                          v_fade=v, brecha=v / c.price - 1, nota="; ".join(flags)))
     df = pd.DataFrame(rows)
-    ok = df.brecha.notna() & ~df.nota.fillna("").str.contains("EBIT ≤ 0")
+    ok = df.brecha.notna() & ~df.nota.fillna("").str.contains("[revisar]", regex=False)
     df.loc[ok, "quintil"] = pd.qcut(df.loc[ok, "brecha"].rank(method="first", ascending=False), 5,
                                     labels=[1, 2, 3, 4, 5]).astype(int)
     df["rf"], df["rf_fecha"] = E.RF, E.RF_DATE

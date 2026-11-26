@@ -5,9 +5,10 @@ backtest no vea el futuro.
 
 Definiciones (convenciones del modelo):
 - Tasa impositiva efectiva = Σ impuesto / Σ resultado antes de impuestos, últimos 5 ejercicios.
-- Tasa de inversión incremental = [Σ (capex - D&A) + Δ capital de trabajo operativo] / Δ ventas, últimos 5
-  ejercicios. Capital de trabajo operativo = (activo corriente - caja - inversiones CP) - (pasivo corriente -
-  deuda CP). No incluye adquisiciones (M&A), igual que reverse_dcf.
+- Tasa de inversión incremental = [Σ (capex - depreciación) + Δ capital de trabajo operativo] / Δ ventas, últimos 5
+  ejercicios. Capex = PP&E + software capitalizado + inmuebles (REIT). Depreciación = D&A menos amortización de
+  intangibles: como el M&A no se cuenta como inversión, tampoco se resta la amortización de lo comprado.
+  Capital de trabajo operativo = (activo corriente - caja - inversiones CP) - (pasivo corriente - deuda CP).
 """
 import os
 
@@ -16,7 +17,8 @@ import pandas as pd
 
 from pit import CAMPOS, OUT
 
-FLOW = {"revenue", "ebit", "pretax", "tax", "net_income", "capex", "da", "acquisitions", "sbc", "shares_dil"}
+FLOW = {"revenue", "ebit", "pretax", "tax", "net_income", "capex", "capex_sw", "capex_re", "da", "amort_intang",
+        "acquisitions", "sbc", "shares_dil"}
 ANNUAL_FORMS = {"10-K", "10-K/A", "10-KT", "20-F", "40-F"}
 YEARS = 5
 TAX_CLIP = (0.0, 0.40)
@@ -100,7 +102,10 @@ def metricas_compania(as_of=None):
         if ini is not None:
             yrs = g[(g.end > ini.end) & (g.end <= last.end)]
             ds = last.revenue - ini.revenue
-            capex_neto = (yrs.capex - yrs.da)
+            capex = yrs.capex.fillna(0) + yrs.capex_sw.fillna(0) + yrs.capex_re.fillna(0)
+            capex = capex.where(yrs[["capex", "capex_sw", "capex_re"]].notna().any(axis=1))
+            dep = yrs.da - yrs.amort_intang.where(yrs.amort_intang < yrs.da, 0).fillna(0)
+            capex_neto = capex - dep
             nwc = lambda x: ((x.assets_cur - (0 if pd.isna(x.cash) else x.cash) - (0 if pd.isna(x.st_invest) else x.st_invest))
                              - (x.liab_cur - (0 if pd.isna(x.debt_cur) else x.debt_cur)))
             dnwc = nwc(last) - nwc(ini)

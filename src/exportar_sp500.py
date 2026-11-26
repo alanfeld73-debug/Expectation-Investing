@@ -63,8 +63,7 @@ def hoja_screen(wb, df):
     rec_col, nota_col = 21, 22
     for i in range(2, last + 1):
         ws.cell(row=i, column=rec_col, value=(
-            f'=IF(S{i}="","SIN DATO",IF(OR(L{i}>Criterios!$B$6,ISNUMBER(SEARCH("conciliar",V{i})),'
-            f'ISNUMBER(SEARCH("EBIT ≤ 0",V{i}))),"REVISAR DATOS",'
+            f'=IF(S{i}="","SIN DATO",IF(OR(L{i}>Criterios!$B$6,ISNUMBER(SEARCH("revisar]",V{i}))),"REVISAR DATOS",'
             f'IF(S{i}>=Criterios!$B$4,"COMPRA",IF(S{i}<=Criterios!$B$5,"VENTA","MANTENER"))))'))
         c = ws.cell(row=i, column=rec_col)
         c.font, c.border, c.alignment = F, THIN, Alignment(horizontal="center")
@@ -85,7 +84,8 @@ def hoja_resumen(wb, df, last_screen):
         "Corrida CRUDA: defaults por sector, sin normalizar ítems no recurrentes, M&A ni guías ajustadas.",
         "Sirve para ordenar el universo y elegir los 40-60 candidatos de la Semana 2, no para decidir compras.",
         f"Rf = {df.rf.iloc[0]:.2%} (FRED DGS10 al {df.rf_fecha.iloc[0]}). ERP 5%. Beta 5 años acotada 0,8-1,8.",
-        "Recomendación: umbrales en la hoja Criterios. REVISAR DATOS = EBIT ≤ 0, ventas TV vs SEC no concilian o valor sin crecimiento > 150% del EV.",
+        "Recomendación: umbrales en la hoja Criterios. REVISAR DATOS = nota con [revisar]: EBIT ≤ 0, posible M&A (TTM salta >15% o consenso >30%), ventas TV vs SEC no concilian, valor negativo o valor sin crecimiento > 150% del EV. No entran en los quintiles.",
+        "La brecha mediana del índice es muy negativa: el modelo es conservador (fade a 4% y residual sin crecimiento). Para la Semana 2 importa el orden relativo (quintiles), no el nivel.",
     ]
     for i, n in enumerate(notas, 3):
         ws.cell(row=i, column=1, value=n).font = F
@@ -101,8 +101,6 @@ def hoja_resumen(wb, df, last_screen):
     ws["A15"].font = ws["B15"].font = BOLD
     ws["D8"], ws["E8"], ws["F8"], ws["G8"] = "Quintil de brecha", "Compañías", "Brecha mediana", "g implícito mediano"
     _style_header(ws, 8, 7)
-    for c in ("A", "B", "C"):
-        pass
     for i, q in enumerate(range(1, 6), 9):
         sub = df[df.quintil == q]
         ws.cell(row=i, column=4, value=q).font = BOLD
