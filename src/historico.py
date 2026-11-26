@@ -56,6 +56,22 @@ def betas(px, mes, n=60, minimo=24):
     return out
 
 
+def ajustar_acciones(n, fecha_dato, mes, fs, ticker):
+    """Lleva una cantidad de acciones a la base de `mes`: corrige escala (dato cargado en millones) y splits
+    ocurridos entre la fecha del dato y `mes` (factor_split = splits posteriores a cada mes)."""
+    if n is None or pd.isna(n) or n <= 0:
+        return None
+    if n < 1e4:          # error de escala en el XBRL de la compañía (p.ej. MCD informa 716,4)
+        n = n * 1e6
+    if ticker not in fs.columns:
+        return float(n)
+    serie = fs[ticker].dropna()
+    m_dato = pd.Timestamp(fecha_dato).to_period("M")
+    f_dato = serie[serie.index <= m_dato].iloc[-1] if (serie.index <= m_dato).any() else serie.iloc[0]
+    f_mes = serie[serie.index <= mes].iloc[-1] if (serie.index <= mes).any() else serie.iloc[0]
+    return float(n * f_dato / f_mes)
+
+
 def fecha(t, u, px):
     mes = t.to_period("M")
     E.RF = rf_en(t)
@@ -65,7 +81,9 @@ def fecha(t, u, px):
     m2 = miembros.merge(met, left_on="ticker", right_index=True, how="left")
     sec = m2.groupby("sector").agg(tax_default=("tax_rate", "median"), inv_default=("inv_rate", "median"))
     sec = sec.fillna({"tax_default": m2.tax_rate.median(), "inv_default": m2.inv_rate.median()})
-    saldos = {c: F.ultimo_saldo(c, t) for c in ("shares_out", "debt_cur", "debt_lt", "cash", "st_invest", "equity")}
+    saldos = {c: F.ultimo_saldo(c, t) for c in ("debt_cur", "debt_lt", "cash", "st_invest", "equity")}
+    acc_bal = F.ultimo_saldo("shares_out", t, con_fecha=True)
+    fs = px.pivot(index="mes", columns="ticker", values="factor_split").sort_index()
     p_mes = px[px.mes == mes].set_index("ticker")
     b = betas(px, mes)
     filas = []
@@ -76,7 +94,15 @@ def fecha(t, u, px):
             continue
         m = met.loc[r.ticker]
         precio = float(p_mes.loc[r.ticker, "close"] * p_mes.loc[r.ticker, "factor_split"])
-        acc = saldos["shares_out"].get(r.ticker)
+        acc, acc_fy, nota_acc = None, None, None
+        if r.ticker in acc_bal.index:
+            acc = ajustar_acciones(acc_bal.loc[r.ticker, "val"], acc_bal.loc[r.ticker, "end"], mes, fs, r.ticker)
+        if pd.notna(m.get("acciones_fy")):
+            acc_fy = ajustar_acciones(m.acciones_fy, m.fy_end, mes, fs, r.ticker)
+        if not acc and acc_fy:
+            acc = acc_fy   # varias clases de acciones: diluidas promedio del último ejercicio
+        elif acc and acc_fy and not 0.5 <= acc / acc_fy <= 2:
+            acc, nota_acc = acc_fy, "acciones del balance inconsistentes: se usan las diluidas"
         if not acc or pd.isna(m.ventas_fy) or pd.isna(m.get("g_fy")):
             filas.append(dict(base, nota="faltan acciones, ventas o crecimiento"))
             continue
@@ -91,6 +117,8 @@ def fecha(t, u, px):
         sd = SimpleNamespace(tax_default=float(sec.loc[r.sector, "tax_default"]),
                              inv_default=float(sec.loc[r.sector, "inv_default"]))
         c, flags = SP.construir(rr, d, sd, dict(ventas_fy=m.ventas_fy, cagr3=m.get("cagr3")))
+        if nota_acc:
+            flags.append(nota_acc)
         if c is None:
             filas.append(dict(base, precio=precio, nota="; ".join(flags)))
             continue
@@ -115,7 +143,8 @@ def fecha(t, u, px):
         ey = (c.ni0 / c.mcap) if c.model == "EQUITY" else (c.sales0 * c.m0 * (1 - c.tax) / c.ev)
         filas.append(dict(base, modelo=c.model, precio=precio, mcap_bn=c.mcap / 1e9, g_ref=c.g_ref, g_term=c.g_term,
                           g_impl=gi, p_base_rate=p_br, ss_share=ss, ey=ey, brecha=v / precio - 1,
-                          brecha_4=v4 / precio - 1, rf=E.RF, nota="; ".join(flags)))
+                          brecha_4=v4 / precio - 1, rf=E.RF, ebit_aprox=bool(m.get("ebit_aprox")),
+                          nota="; ".join(flags)))
     df = pd.DataFrame(filas)
     ok = df.brecha.notna() & ~df.nota.fillna("").str.contains("[revisar]", regex=False)
     return sesgo.rankings(df, ok), len(miembros)

@@ -17,7 +17,7 @@ import pandas as pd
 
 from pit import CAMPOS, OUT
 
-FLOW = {"revenue", "ebit", "pretax", "tax", "net_income", "capex", "capex_sw", "capex_re", "da", "amort_intang",
+FLOW = {"revenue", "ebit", "interest", "pretax", "tax", "net_income", "capex", "capex_sw", "capex_re", "da", "amort_intang",
         "acquisitions", "sbc", "shares_dil"}
 ANNUAL_FORMS = {"10-K", "10-K/A", "10-KT", "20-F", "40-F"}
 YEARS = 5
@@ -91,7 +91,12 @@ def metricas_compania(as_of=None):
             continue
         last = g.iloc[-1]
         win = g[g.end > last.end - pd.DateOffset(years=YEARS, days=45)]
-        r = dict(ticker=t, fy_end=last.end, ventas_fy=last.revenue, ebit_fy=last.ebit, ni_fy=last.net_income)
+        r = dict(ticker=t, fy_end=last.end, ventas_fy=last.revenue, ebit_fy=last.ebit, ni_fy=last.net_income,
+                 acciones_fy=last.shares_dil, ebit_aprox=False)
+        if pd.isna(last.ebit) and pd.notna(last.pretax):
+            # Sin línea de resultado operativo: EBIT ≈ resultado antes de impuestos + intereses (SUPUESTOS.md)
+            r["ebit_fy"] = last.pretax + (last.interest if pd.notna(last.interest) else 0.0)
+            r["ebit_aprox"] = True
         prev = _cerca(g, last.end - pd.DateOffset(years=1))
         if prev is not None and prev.revenue > 0:
             r["g_fy"] = float(last.revenue / prev.revenue - 1)
@@ -131,15 +136,16 @@ def metricas_compania(as_of=None):
     return pd.DataFrame(out)
 
 
-def ultimo_saldo(campo, as_of):
+def ultimo_saldo(campo, as_of, con_fecha=False):
     """Último saldo (dato instantáneo) por ticker presentado hasta as_of, de 10-K o 10-Q. Si hay varios tags
     para la misma fecha de cierre, gana el de mayor prioridad. Devuelve Serie ticker -> valor."""
     d = facts()
     d = d[(d.campo == campo) & d.start.isna() & (d.filed <= pd.Timestamp(as_of))
           & d.form.isin(ANNUAL_FORMS | {"10-Q", "10-Q/A"})]
     if d.empty:
-        return pd.Series(dtype=float)
+        return pd.DataFrame(columns=["val", "end"]) if con_fecha else pd.Series(dtype=float)
     prio = {t: i for i, t in enumerate(CAMPOS.get(campo, ["EntityCommonStockSharesOutstanding"]))}
     d = d.assign(prio=d.tag.map(prio).fillna(99))
     d = d.sort_values(["ticker", "end", "prio", "filed"], ascending=[True, False, True, False])
-    return d.drop_duplicates("ticker").set_index("ticker").val
+    d = d.drop_duplicates("ticker").set_index("ticker")
+    return d[["val", "end"]] if con_fecha else d.val

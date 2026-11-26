@@ -22,7 +22,10 @@ DESDE = "2012-01-01"
 # campo normalizado -> tags XBRL en orden de prioridad (se guardan todos; la prioridad se aplica al usar)
 CAMPOS = {
     "revenue": ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet",
-                "RevenueFromContractWithCustomerIncludingAssessedTax", "RevenuesNetOfInterestExpense"],
+                "RevenueFromContractWithCustomerIncludingAssessedTax", "RevenuesNetOfInterestExpense",
+                # Etiquetas previas a ASC 606 (2018), con menor prioridad:
+                "SalesRevenueGoodsNet", "SalesRevenueServicesNet"],
+    "interest": ["InterestExpense", "InterestExpenseDebt", "InterestAndDebtExpense", "InterestExpenseNonoperating"],
     "ebit": ["OperatingIncomeLoss"],
     "pretax": ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
                "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
@@ -48,7 +51,8 @@ CAMPOS = {
     "debt_lt": ["LongTermDebtNoncurrent", "LongTermDebt", "LongTermDebtAndCapitalLeaseObligations"],
     "equity": ["StockholdersEquity",
                "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
-    "shares_dil": ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+    "shares_dil": ["WeightedAverageNumberOfDilutedSharesOutstanding",
+                   "WeightedAverageNumberOfShareOutstandingBasicAndDiluted"],
 }
 TAG2CAMPO = {t: c for c, tags in CAMPOS.items() for t in tags}
 DEI = {"EntityCommonStockSharesOutstanding": "shares_out"}

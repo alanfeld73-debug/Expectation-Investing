@@ -61,3 +61,10 @@ La métrica principal está muy cargada de value: la condición 2 es exigente y 
 | 2026-11-26 | Universo sin deslistadas; se agrega como referencia el promedio con pesos iguales del universo. | Sí |
 | 2026-11-26 | Rebalanceo anual y costos de 20 pb por lado confirmados por el usuario. | Sí |
 | 2026-11-26 | En el backtest, consenso año 1 reemplazado por el crecimiento real de ventas del último ejercicio (SEC). | Sí |
+
+## Resultado (2026-11-26) — no se modificó nada de lo anterior
+Período 2016-05 a 2026-11. **No aprobado: no cumple ninguna condición.**
+- Condición 1: Q1 > SPY en 3 de 9 años (hacía falta la mayoría). Q1 13.1% anual vs SPY 14.3% y universo 12.1%.
+- Condición 2a: alfa -0.75% anual, t = -0.56 (hacía falta > 0 y t ≥ 2).
+- Condición 2b: Q1 > Q5 en 2 de 5 niveles de múltiplo (hacían falta 3).
+Detalle en resultados/backtest_v1.html.

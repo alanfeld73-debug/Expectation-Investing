@@ -35,7 +35,7 @@ def cartera(R, fechas_tickers, nombre):
     for i, (m0, tks) in enumerate(fechas_tickers):
         m1 = fechas_tickers[i + 1][0] if i + 1 < len(fechas_tickers) else R.index.max()
         meses = R.index[(R.index > m0) & (R.index <= m1)]
-        tks = [t for t in tks if t in R.columns]
+        tks = list(dict.fromkeys(t for t in tks if t in R.columns))
         if not tks or len(meses) == 0:
             continue
         w = pd.Series(1 / len(tks), index=tks)
@@ -124,7 +124,7 @@ def main():
     res = dict(desde=str(M.index.min()), hasta=str(ultimo), criterio1=c1, criterio2a=c2a, criterio2b=c2b,
                aprobado=bool(c1["cumple"] and c2a["cumple"] and c2b["cumple"]), stats=st,
                regresion=reg.round(5).to_dict(), regresion_universo=reg_univ.round(5).to_dict(), exclusiones=excl,
-               n_q1=rk[rk.quintil == 1].groupby("fecha").size().astype(int).to_dict())
+               n_q1={str(pd.Timestamp(k).date()): int(v) for k, v in rk[rk.quintil == 1].groupby("fecha").size().items()})
     with open(os.path.join(DIR, "resultado.json"), "w") as f:
         json.dump(res, f, indent=1, default=str)
     pd.set_option("display.width", 200)

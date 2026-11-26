@@ -93,6 +93,8 @@ def main():
             dentro += 1
         resumen.append((f.date(), len(miembros), dentro))
     df = pd.DataFrame(filas)
+    # Dos tickers históricos que hoy son la misma compañía (p.ej. HCP y PEAK -> DOC) cuentan una sola vez
+    df = pd.concat([df[df.ticker.isna()], df[df.ticker.notna()].drop_duplicates(["fecha", "ticker"])]).sort_index()
     df.to_csv(OUT, index=False)
     for f, n, d in resumen:
         print(f"{f}: {n} miembros, {d} con ticker vigente ({n - d} afuera)")

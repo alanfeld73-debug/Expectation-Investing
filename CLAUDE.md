@@ -36,6 +36,10 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/sesgo.py`: rankings (principal, 4%, P(base rate), sector, doble orden por múltiplo) y diagnóstico de sesgo value.
 - `src/factores.py`: regresión Fama-French 5 + momentum (Newey-West) para el backtest.
 - `PREREGISTRO.md`: diseño y criterio del backtest fijados antes de ver resultados. No cambiar sin anotar.
+- `src/universo_bt.py`: miembros históricos del S&P 500 por fecha de rebalanceo (renombres, sector GICS/SIC).
+- `src/precios.py`: precios mensuales de Yahoo (close, adjclose, factor de split).
+- `src/historico.py`: brecha point-in-time en cada rebalanceo con el mismo modelo del screen.
+- `src/backtest.py` / `src/reporte_backtest.py`: carteras, criterio pre-registrado y página de resultados.
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 
@@ -54,6 +58,7 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 ## Plan de trabajo
 - Semana 1: corrida cruda del S&P 500 con defaults por sector + base point-in-time (SEC, desde 2012).
 - Semana 2: normalización manual de 40-60 candidatos + backtest v1 (quintiles de brecha vs. SPY).
+- Backtest v1 (2026-11-26): NO aprobado. Ver PREREGISTRO.md y resultados/backtest_v1.html.
 - Semana 3: resultados y decisión. Criterio definido ANTES de ver resultados: el quintil de mayor brecha
   le gana al SPY después de costos en la mayoría de los años y no se explica solo por value.
 
