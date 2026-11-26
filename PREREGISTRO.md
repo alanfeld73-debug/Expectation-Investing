@@ -80,3 +80,12 @@ Pedido del usuario: más historia y RSP como referencia.
 - **Sin cambios** en la métrica, la cartera, el rebalanceo, los costos ni las variantes.
 - Ajuste técnico necesario: en 2010-2011 hay menos historia por compañía, así que la tasa de inversión acepta ventanas
   de 2 años (antes, mínimo 3) y el crecimiento previo de 3 años puede faltar (el base rate usa solo el tamaño).
+
+## Resultado de la extensión v1b (2026-11-26)
+**No aprobado en ningún tramo.**
+| Condición | 2010-2016 (fuera de muestra) | 2016-2026 | Completo |
+|---|---|---|---|
+| 1. Q1 > SPY (años) | 3 de 5 — cumple | 3 de 9 — no | 7 de 15 — no |
+| 2a. Alfa anual (t) | 1.73% (1.22) — no | -0.65% (-0.49) — no | 0.50% (0.47) — no |
+| 2b. Doble orden (niveles) | 4 de 5 — cumple | 1 de 5 — no | 4 de 5 — cumple |
+| Referencia: alfa Q1 − RSP (t) | 1.26% (1.13) | 1.37% (1.38) | 1.49% (1.78) |
