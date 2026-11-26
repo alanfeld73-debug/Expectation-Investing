@@ -32,6 +32,7 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/fundamentals.py`: series anuales con `as_of` (sin look-ahead), tasas impositiva y de inversión por compañía.
 - `src/defaults_sector.py`: defaults por sector GICS (medianas).
 - `src/screen_sp500.py` / `src/exportar_sp500.py`: corrida cruda del S&P 500 y su Excel.
+- `src/exportar_html.py`: página HTML de la corrida del S&P 500 (tabla filtrable, quintiles, sectores).
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 
