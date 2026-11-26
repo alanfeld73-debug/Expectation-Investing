@@ -136,6 +136,35 @@ def main():
     filas_excl = "".join(f'<tr><td>{f}</td><td class="r num">{v["miembros"]}</td><td class="r num">{v["afuera"]}</td>'
                          f'<td class="r num">{pct(v["afuera"] / v["miembros"], 0)}</td></tr>' for f, v in r["exclusiones"].items())
     n_ok = sum(t["aprobado"] for t in (oos, v1, full))
+    conc_html = ""
+    pc = os.path.join(DIR, "concentracion.json")
+    if os.path.exists(pc):
+        cj = json.load(open(pc))
+        filas_c = ""
+        for nombre, d in [(f"Top {k}", v) for k, v in cj["top"].items()] + [(k, v) for k, v in cj["ref"].items()]:
+            es_top = nombre.startswith("Top")
+            filas_c += (f'<tr><td>{nombre}</td><td class="r num">{pct(d["cagr"])}</td><td class="r num">{pct(d["cagr_oos"])}</td>'
+                        f'<td class="r num">{pct(d["cagr_v1"])}</td><td class="r num">{pct(d["vol"])}</td>'
+                        f'<td class="r num">{pct(d["max_dd"], 0)}</td>'
+                        f'<td class="r num">{(str(d["gana_rsp"]) + " de " + str(d["anios"])) if es_top else "—"}</td>'
+                        f'<td class="r num">{(pct(d["alfa_rsp"]) + ", t = " + num(d["t_rsp"])) if es_top else "—"}</td>'
+                        f'<td class="r num">{(pct(d["azar_p10"]) + " / " + pct(d["azar_p90"])) if es_top else "—"}</td>'
+                        f'<td class="r num">{pct(d["percentil_vs_azar"], 0) if es_top else "—"}</td></tr>')
+        conc_html = f"""
+  <section class="panel">
+    <div class="eyebrow">Exploratorio · posterior a los resultados · no pre-registrado</div>
+    <h2>¿Concentrar en el top 15, 20 o 25 ayuda?</h2>
+    <div class="scroll"><table><thead><tr><th>Cartera</th><th class="r">Completo</th><th class="r">2010-16</th>
+      <th class="r">2016-26</th><th class="r">Volatilidad</th><th class="r">Peor caída</th><th class="r">Años &gt; RSP</th>
+      <th class="r">Alfa vs RSP</th><th class="r">Azar p10 / p90</th><th class="r">Percentil vs azar</th></tr></thead>
+      <tbody>{filas_c}</tbody></table></div>
+    <p class="note">Top N = las N de mayor brecha, pesos iguales, mismas reglas. Azar = {cj["n_azar"]} carteras de N acciones
+      elegidas al azar dentro del Q1 de cada año. Percentil 50% = igual que elegir al azar dentro del Q1. No: el top N
+      queda en el medio de la distribución al azar y no hay patrón (20 rinde más que 15 y que 25): concentrar suma
+      volatilidad sin sumar retorno. Probar varias variantes después de ver los resultados aumenta la chance de que
+      alguna parezca buena por azar.</p>
+  </section>
+"""
     titulo = ("No aprobado en ningún tramo" if n_ok == 0 else
               "Aprobado fuera de muestra" if oos["aprobado"] else f"Aprobado en {n_ok} de 3 tramos")
     color = "var(--sell)" if not oos["aprobado"] else "var(--buy)"
@@ -215,6 +244,7 @@ table.crit td {{ white-space: normal; vertical-align: middle; }}
       a SPY y RSP, que sí las incluyen; pesa más en los primeros años.</p></div>
   </section>
 
+{conc_html}
   <section class="panel prose">
     <h2>Cómo leerlo</h2>
     <ul>

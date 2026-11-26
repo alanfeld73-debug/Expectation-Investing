@@ -40,6 +40,7 @@ Investing (Rappaport & Mauboussin). Destino final: dashboard confiable para deci
 - `src/precios.py`: precios mensuales de Yahoo (close, adjclose, factor de split).
 - `src/historico.py`: brecha point-in-time en cada rebalanceo con el mismo modelo del screen.
 - `src/backtest.py` / `src/reporte_backtest.py`: carteras, criterio pre-registrado y página de resultados.
+- `src/concentracion.py`: exploratorio, top N de brecha contra carteras al azar del Q1.
 - `src/config.py`: User-Agent de la SEC (sobreescribible con la variable SEC_USER_AGENT).
 - `SUPUESTOS.md`: registro de supuestos y cambios con fecha y motivo.
 
